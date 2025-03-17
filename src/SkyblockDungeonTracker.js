@@ -14,7 +14,7 @@ const SkyblockDungeonTracker = () => {
   const [selectedMasterFloor, setSelectedMasterFloor] = useState('1');
   const [expandedSections, setExpandedSections] = useState({
     floorDetails: true,
-    essenceCollection: false
+    essenceCollection: true
   });
 
   // Demo players for quick access
