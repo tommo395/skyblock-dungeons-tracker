@@ -19,9 +19,10 @@ const SkyblockDungeonTracker = () => {
 
   // Demo players for quick access
   const demoPlayers = [
-    { name: 'tommo395', description: 'Catacombs 29' },
-    { name: 'Refraction', description: 'YouTuber' },
-    { name: 'Technoblade', description: 'Legend' }
+    { name: 'tommo395', description: 'creator' },
+    { name: 'midori642', description: 'cold guy' },
+    { name: 'LeDucTaep', description: 'geko man' },
+    { name: 'boolfalse', description: 'im scared' }
   ];
 
   // Fetch player data

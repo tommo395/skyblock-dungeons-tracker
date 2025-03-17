@@ -7,15 +7,15 @@ module.exports = {
     extend: {
       colors: {
         // Base backgrounds
-        primary: '#0f172a',     // Main dark background
-        secondary: '#1e293b',   // Card background
-        tertiary: '#334155',    // Inner elements
-        accent: '#475569',      // Borders
-        
+        primary: '#0f172a',     // Dark blue background
+        secondary: '#1e293b',   // Slightly lighter blue
+        tertiary: '#334155',    // Even lighter blue accent
+        accent: '#475569',      // Border color
+
         // Text colors
-        "text-primary": '#f8fafc',   // Main text
-        "text-secondary": '#94a3b8', // Secondary text
-        "text-tertiary": '#64748b',  // Muted text
+        "text-primary": '#f8fafc',   // Almost white
+        "text-secondary": '#94a3b8', // Light gray
+        "text-tertiary": '#64748b',  // Darker gray
         
         // Class colors
         "class-archer": '#84cc16',   // Green
@@ -40,15 +40,15 @@ module.exports = {
         "score-c": '#aaaaaa',
         
         // UI colors
-        "ui-primary": '#3b82f6',     // Primary blue
+        "ui-primary": '#3b82f6',     // Blue
         "ui-success": '#10b981',     // Green
-        "ui-warning": '#f59e0b',     // Amber/warning
-        "ui-danger": '#ef4444',      // Red/danger
-        "ui-info": '#06b6d4',        // Cyan/info
+        "ui-warning": '#f59e0b',     // Amber
+        "ui-danger": '#ef4444',      // Red
+        "ui-info": '#06b6d4',        // Cyan
         
         // Mode colors
-        "mode-normal": '#3b82f6',    // Normal mode
-        "mode-master": '#dc2626',    // Master mode
+        "mode-normal": '#3b82f6',    // Blue for normal mode
+        "mode-master": '#dc2626',    // Red for master mode
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
