@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Shield, Sword, Wand, Heart, Target, Clock, Trophy, Award, Star, Activity, Search, 
-  FlaskConical, Loader, AlertTriangle, BookOpen, ChevronDown, ChevronUp, Info, RefreshCw } from 'lucide-react';
+  FlaskConical, Loader, AlertTriangle, BookOpen, ChevronDown, ChevronUp, Info, RefreshCw,
+  X, User, BrainCircuit, Calculator } from 'lucide-react';
 
 const SkyblockDungeonTracker = () => {
   // State management
-  const [playerName, setPlayerName] = useState('');
+  const [playerNameInput, setPlayerNameInput] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [playerData, setPlayerData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -16,6 +18,9 @@ const SkyblockDungeonTracker = () => {
     floorDetails: true,
     essenceCollection: true
   });
+  const [playerAvatar, setPlayerAvatar] = useState(null);
+  const [statsLoaded, setStatsLoaded] = useState(false);
+  const searchInputRef = useRef(null);
 
   // Demo players for quick access
   const demoPlayers = [
@@ -25,14 +30,51 @@ const SkyblockDungeonTracker = () => {
     { name: 'boolfalse', description: 'im scared' }
   ];
 
+  // Parse URL parameters on component mount
+  useEffect(() => {
+    // Check for player parameter in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const playerFromUrl = urlParams.get('player');
+    
+    if (playerFromUrl) {
+      setPlayerNameInput(playerFromUrl);
+      fetchPlayerData(playerFromUrl);
+    }
+  }, []);
+
+  // Update URL when player changes
+  const updateUrlWithPlayer = (name) => {
+    if (!name) return;
+    
+    const url = new URL(window.location);
+    url.searchParams.set('player', name);
+    window.history.pushState({}, '', url);
+  };
+
+  // Fetch player avatar
+  const fetchPlayerAvatar = async (name) => {
+    try {
+      // Use Minecraft API to get player avatar
+      const avatarUrl = `https://mc-heads.net/avatar/${name}/64`;
+      setPlayerAvatar(avatarUrl);
+    } catch (err) {
+      console.error("Failed to fetch player avatar:", err);
+      setPlayerAvatar(null);
+    }
+  };
+
   // Fetch player data
-  const fetchPlayerData = async (name = playerName) => {
+  const fetchPlayerData = async (name = playerNameInput) => {
     if (!name) return;
     
     setLoading(true);
+    setStatsLoaded(false);
     setError('');
     
     try {
+      // Fetch player avatar
+      fetchPlayerAvatar(name);
+      
       const response = await fetch(`https://sky.shiiyu.moe/api/v2/dungeons/${name}`);
       
       if (!response.ok) {
@@ -46,7 +88,8 @@ const SkyblockDungeonTracker = () => {
       }
       
       setPlayerData(data);
-      setPlayerName(name);
+      setDisplayName(name);
+      updateUrlWithPlayer(name);
       
       // Find the active profile
       const activeProfileKey = Object.keys(data.profiles).find(key => 
@@ -65,6 +108,8 @@ const SkyblockDungeonTracker = () => {
         const highestMasterFloor = data.profiles[activeProfileKey].dungeons.master_catacombs.highest_floor;
         setSelectedMasterFloor(highestMasterFloor.replace('floor_', ''));
       }
+      
+      setStatsLoaded(true);
     } catch (err) {
       setError(err.message || 'Failed to fetch player data');
     } finally {
@@ -110,6 +155,19 @@ const SkyblockDungeonTracker = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     fetchPlayerData();
+    
+    // Dismiss keyboard on mobile
+    if (searchInputRef.current) {
+      searchInputRef.current.blur();
+    }
+  };
+
+  // Clear search input
+  const clearSearch = () => {
+    setPlayerNameInput('');
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
   };
 
   // Function to get class icon with appropriate coloring
@@ -248,6 +306,15 @@ const SkyblockDungeonTracker = () => {
     return classData;
   };
 
+  // Calculate class average
+  const getClassAverage = () => {
+    const classData = getClassData();
+    if (!classData || classData.length === 0) return 0;
+    
+    const totalLevels = classData.reduce((sum, cls) => sum + cls.level, 0);
+    return (totalLevels / classData.length).toFixed(2);
+  };
+
   // Get total completions
   const getTotalCompletions = () => {
     const dungeons = getDungeonsData();
@@ -262,6 +329,171 @@ const SkyblockDungeonTracker = () => {
     if (!dungeons) return 0;
     
     return dungeons.secrets_found || 0;
+  };
+
+  // Get secrets per run
+  const getSecretsPerRun = () => {
+    const totalSecrets = getSecretsFound();
+    const totalRuns = getTotalCompletions();
+    
+    if (!totalRuns) return 0;
+    return (totalSecrets / totalRuns).toFixed(2);
+  };
+
+  // Calculate dungeon weight with no artificial cap - 1000 is achievable only with perfect stats
+  const calculateDungeonWeight = () => {
+    if (!getDungeonsData()) return 0;
+    
+    // Max level references - perfect theoretical stats
+    const MAX_CATA_LEVEL = 50;
+    const MAX_CLASS_LEVEL = 50;
+    const MAX_CLASSES = 5; // Healer, Mage, Archer, Tank, Berserk
+    
+    // Reference values for very endgame players
+    const ENDGAME_SECRETS = 150000;
+    const ENDGAME_COMPLETIONS = 10000;
+    
+    // Get actual player values
+    const catacombsLevel = getCatacombsLevel().level;
+    const catacombsXp = getCatacombsLevel().totalXp || 0;
+    const classData = getClassData();
+    const secretsFound = getSecretsFound();
+    const totalCompletions = getTotalCompletions();
+    
+    // Component weights - set so theoretical perfect player would score exactly 1000
+    const catacombsComponent = (catacombsLevel / MAX_CATA_LEVEL) * 300;
+    
+    // Class component - considers both average and total levels
+    const classLevels = classData.reduce((sum, cls) => sum + cls.level, 0);
+    const maxPossibleClassLevels = MAX_CLASSES * MAX_CLASS_LEVEL;
+    const classAverage = classData.length > 0 ? classLevels / classData.length : 0;
+    const maxClassAverage = MAX_CLASS_LEVEL;
+    
+    // Weight both total levels and average (incentivizes balanced progression)
+    const totalClassWeight = (classLevels / maxPossibleClassLevels) * 150;
+    const avgClassWeight = (classAverage / maxClassAverage) * 100;
+    const classComponent = totalClassWeight + avgClassWeight;
+    
+    // Secrets component - logarithmic scale to better represent value
+    // No player will reach the theoretical maximum of ENDGAME_SECRETS
+    const secretsRatio = Math.min(1, secretsFound / ENDGAME_SECRETS);
+    const secretsComponent = Math.pow(secretsRatio, 0.6) * 200;
+    
+    // Completions component - also logarithmic
+    const completionsRatio = Math.min(1, totalCompletions / ENDGAME_COMPLETIONS);
+    const completionsComponent = Math.pow(completionsRatio, 0.7) * 150;
+    
+    // Master Mode bonus - extra weight for master mode progress
+    const masterModeComponent = calculateMasterModeWeight();
+    
+    // "Perfect score" bonuses - small boosts for perfect achievements
+    const perfectScoreComponent = calculatePerfectScoreBonus();
+    
+    // Floor completion bonus
+    const floorCompletionBonus = hasCompletedAllFloors() ? 30 : 0;
+    
+    // Sum all components - will naturally approach 1000 as player approaches perfect stats
+    const totalWeight = catacombsComponent + 
+                      classComponent + 
+                      secretsComponent + 
+                      completionsComponent + 
+                      masterModeComponent +
+                      perfectScoreComponent +
+                      floorCompletionBonus;
+    
+    // Return rounded weight (no artificial cap at 1000)
+    return Math.round(totalWeight);
+  };
+
+  // Calculate master mode weight component (up to 50 points)
+  const calculateMasterModeWeight = () => {
+    const dungeons = getDungeonsData();
+    if (!dungeons || !dungeons.master_catacombs || !dungeons.master_catacombs.floors) {
+      return 0;
+    }
+    
+    let totalWeight = 0;
+    // Award points for each master floor completion (higher floors worth more)
+    for (let i = 1; i <= 7; i++) {
+      const floor = dungeons.master_catacombs.floors[i];
+      if (floor && floor.stats && floor.stats.tier_completions) {
+        // Higher floors worth more, logarithmic scaling with completions
+        const completions = floor.stats.tier_completions;
+        const floorMultiplier = i; // M1=1, M2=2, etc.
+        totalWeight += Math.min(floorMultiplier * 5, Math.log10(completions + 1) * floorMultiplier * 3);
+      }
+    }
+    
+    return Math.min(50, totalWeight);
+  };
+
+  // Calculate bonus for perfect scores (up to 20 points)
+  const calculatePerfectScoreBonus = () => {
+    const dungeons = getDungeonsData();
+    if (!dungeons) return 0;
+    
+    let totalBonus = 0;
+    
+    // Check for S+ scores in normal mode
+    if (dungeons.catacombs && dungeons.catacombs.floors) {
+      for (let i = 1; i <= 7; i++) {
+        const floor = dungeons.catacombs.floors[i];
+        if (floor && floor.stats && floor.stats.best_score >= 300) {
+          totalBonus += i * 0.5; // 0.5 points for F1, 1 for F2, etc.
+        }
+      }
+    }
+    
+    // Check for S+ scores in master mode (worth more)
+    if (dungeons.master_catacombs && dungeons.master_catacombs.floors) {
+      for (let i = 1; i <= 7; i++) {
+        const floor = dungeons.master_catacombs.floors[i];
+        if (floor && floor.stats && floor.stats.best_score >= 300) {
+          totalBonus += i * 1; // 1 point for M1, 2 for M2, etc.
+        }
+      }
+    }
+    
+    return Math.min(20, totalBonus);
+  };
+
+  // Helper function to check if player has completed all floors
+  const hasCompletedAllFloors = () => {
+    const dungeons = getDungeonsData();
+    if (!dungeons || !dungeons.catacombs || !dungeons.catacombs.floors) return false;
+    
+    // Check if player has completed floors 0-7
+    for (let i = 0; i <= 7; i++) {
+      const floor = dungeons.catacombs.floors[i];
+      if (!floor || !floor.stats || !floor.stats.tier_completions || floor.stats.tier_completions < 1) {
+        return false;
+      }
+    }
+    
+    // Check master mode floors (M1-M7)
+    if (dungeons.master_catacombs && dungeons.master_catacombs.floors) {
+      for (let i = 1; i <= 7; i++) {
+        const floor = dungeons.master_catacombs.floors[i];
+        if (!floor || !floor.stats || !floor.stats.tier_completions || floor.stats.tier_completions < 1) {
+          return false;
+        }
+      }
+      return true; // All normal and master floors completed
+    }
+    
+    return false; // Didn't complete all master floors
+  };
+
+  // Helper function to get color class based on dungeon weight 
+  const getDungeonWeightColor = () => {
+    const weight = calculateDungeonWeight();
+    
+    if (weight >= 900) return 'bg-purple-600';   // Endgame
+    if (weight >= 700) return 'bg-purple-400';   // Late endgame
+    if (weight >= 500) return 'bg-green-500';    // Late game
+    if (weight >= 300) return 'bg-yellow-500';   // Mid game
+    if (weight >= 100) return 'bg-yellow-600';   // Early-mid game
+    return 'bg-red-500';                         // Early game
   };
 
   // Get highest floor
@@ -350,28 +582,64 @@ const SkyblockDungeonTracker = () => {
     </div>
   );
 
+  // Scroll to results when stats loaded on mobile only
+  useEffect(() => {
+    if (statsLoaded && playerData) {
+      // Check if the device is mobile (screen width less than 768px)
+      const isMobile = window.innerWidth < 768;
+      
+      if (isMobile) {
+        // Scroll to results with a small delay to ensure DOM is updated
+        setTimeout(() => {
+          const resultsElement = document.getElementById('results-section');
+          if (resultsElement) {
+            resultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 300);
+      }
+    }
+  }, [statsLoaded, playerData]);
+
   return (
     <div className="min-h-screen bg-primary text-text-primary p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header with Search */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 text-center text-ui-warning">Skyblock Dungeons Stats Tracker</h1>
-          <p className="text-center text-text-secondary mb-6">Enter a Hypixel Skyblock player name to view their dungeon statistics</p>
+          <div className="text-center mb-4">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2 text-ui-warning flex items-center justify-center">
+              <Trophy className="mr-2" size={32} />
+              Skyblock Dungeons Stats Tracker
+            </h1>
+            <p className="text-center text-text-secondary mb-2">Enter a Hypixel Skyblock player name to view their dungeon statistics</p>
+          </div>
           
           {/* Search Form */}
           <div className="bg-secondary p-6 rounded-lg shadow-card">
             <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4">
-              <input
-                type="text"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="Enter player IGN (e.g. tommo395)"
-                className="flex-grow bg-tertiary text-text-primary px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-ui-primary"
-              />
+              <div className="relative flex-grow">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={playerNameInput}
+                  onChange={(e) => setPlayerNameInput(e.target.value)}
+                  placeholder="Enter player IGN (e.g. tommo395)"
+                  className="w-full bg-tertiary text-text-primary px-4 py-2 pl-10 pr-10 rounded focus:outline-none focus:ring-2 focus:ring-ui-primary"
+                />
+                <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" />
+                {playerNameInput && (
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-secondary hover:text-ui-danger"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
               <button
                 type="submit"
                 className="bg-ui-primary text-text-primary px-6 py-2 rounded hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-ui-primary disabled:opacity-50 transition"
-                disabled={loading || !playerName}
+                disabled={loading || !playerNameInput}
               >
                 {loading ? (
                   <span className="flex items-center justify-center">
@@ -410,6 +678,22 @@ const SkyblockDungeonTracker = () => {
                 <span>{error}</span>
               </div>
             )}
+            
+            {loading && (
+              <div className="mt-4 p-3 bg-ui-info bg-opacity-30 border border-ui-info text-text-primary rounded flex items-center justify-center">
+                <Loader size={18} className="mr-2 animate-spin" />
+                <span>Loading player data...</span>
+              </div>
+            )}
+            
+            {statsLoaded && (
+              <div className="mt-4 p-3 bg-ui-success bg-opacity-30 border border-ui-success text-text-primary rounded flex items-center justify-center">
+                <div className="flex items-center">
+                  <span>✓ Stats loaded! </span>
+                  <span className="ml-1 text-ui-success">Scroll down to view</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         
@@ -434,49 +718,78 @@ const SkyblockDungeonTracker = () => {
         
         {/* Player Data Display */}
         {activeProfile && getDungeonsData() && (
-          <div>
+          <div id="results-section">
             {/* Player Header */}
-            <div className="mb-8 text-center">
-              <h1 className="text-4xl font-bold mb-2 text-ui-warning flex items-center justify-center">
-                <Trophy className="mr-2" />
-                {playerName}'s Dungeons {activeProfile.cute_name && <span className="text-lg ml-2 text-text-secondary">({activeProfile.cute_name})</span>}
-              </h1>
-              <div className="flex flex-wrap justify-center gap-2 mt-2">
-                <div className="bg-secondary px-3 py-1 rounded-full text-sm flex items-center">
-                  <Search className="w-4 h-4 mr-1" />
-                  <span>{getSecretsFound()} Secrets</span>
-                </div>
-                <div className="bg-secondary px-3 py-1 rounded-full text-sm flex items-center">
-                  <Award className="w-4 h-4 mr-1" />
-                  <span>{getTotalCompletions()} Completions</span>
-                </div>
-                <button 
-                  onClick={() => fetchPlayerData(playerName)}
-                  className="bg-secondary hover:bg-tertiary px-3 py-1 rounded-full text-sm flex items-center transition"
-                >
-                  <RefreshCw size={14} className="mr-1" />
-                  <span>Refresh</span>
-                </button>
-              </div>
-            </div>
-            
-            {/* Profile Selector (if multiple profiles) */}
-            {Object.keys(playerData.profiles || {}).length > 1 && (
-              <div className="bg-secondary p-4 rounded-lg mb-6 shadow-card">
-                <h3 className="text-lg font-medium text-text-primary mb-2">Profiles</h3>
-                <div className="flex flex-wrap gap-2">
-                  {Object.values(playerData.profiles).map(profile => (
-                    <button
-                      key={profile.profile_id}
-                      className={`px-3 py-1 rounded transition ${activeProfile?.profile_id === profile.profile_id ? 'bg-ui-primary text-text-primary' : 'bg-tertiary text-text-secondary hover:bg-opacity-80'}`}
-                      onClick={() => setActiveProfile(profile)}
+            <div className="mb-8">
+              <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-4 mb-4">
+                {playerAvatar && (
+                  <div className="flex-shrink-0">
+                    <img 
+                      src={playerAvatar}
+                      alt={`${displayName}'s avatar`}
+                      className="w-16 h-16 md:w-20 md:h-20 rounded-lg border-4 border-ui-warning"
+                    />
+                  </div>
+                )}
+                <div className="text-center md:text-left flex-grow">
+                  <h1 className="text-3xl md:text-4xl font-bold text-ui-warning flex items-center justify-center md:justify-start">
+                    {displayName}'s Dungeons
+                    {activeProfile.cute_name && 
+                      <span className="text-lg ml-2 text-text-secondary">({activeProfile.cute_name})</span>
+                    }
+                  </h1>
+                  <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
+                    <div className="bg-secondary px-3 py-1 rounded-full text-sm flex items-center">
+                      <Search className="w-4 h-4 mr-1" />
+                      <span>{getSecretsFound()} Secrets</span>
+                    </div>
+                    <div className="bg-secondary px-3 py-1 rounded-full text-sm flex items-center">
+                      <Award className="w-4 h-4 mr-1" />
+                      <span>{getTotalCompletions()} Completions</span>
+                    </div>
+                    <div className="bg-secondary px-3 py-1 rounded-full text-sm flex items-center">
+                      <Calculator className="w-4 h-4 mr-1" />
+                      <span>{getSecretsPerRun()} Secrets/Run</span>
+                    </div>
+                    <button 
+                      onClick={() => fetchPlayerData(displayName)}
+                      className="bg-secondary hover:bg-tertiary px-3 py-1 rounded-full text-sm flex items-center transition"
                     >
-                      {profile.cute_name}
+                      <RefreshCw size={14} className="mr-1" />
+                      <span>Refresh</span>
                     </button>
-                  ))}
+                  </div>
+                </div>
+                
+                {/* Dungeon Weight */}
+                <div className="flex-shrink-0 bg-secondary px-4 py-3 rounded-lg border border-ui-warning">
+                  <div className="text-center">
+                    <div className="text-sm text-text-secondary">Dungeon Weight</div>
+                    <div className="text-2xl font-bold text-ui-warning">
+                      {calculateDungeonWeight()} / 1000
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
+              
+              {/* Profile Selector (if multiple profiles) */}
+              {Object.keys(playerData.profiles || {}).length > 1 && (
+                <div className="bg-secondary p-4 rounded-lg mt-4 shadow-card">
+                  <h3 className="text-lg font-medium text-text-primary mb-2">Profiles</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.values(playerData.profiles).map(profile => (
+                      <button
+                        key={profile.profile_id}
+                        className={`px-3 py-1 rounded transition ${activeProfile?.profile_id === profile.profile_id ? 'bg-ui-primary text-text-primary' : 'bg-tertiary text-text-secondary hover:bg-opacity-80'}`}
+                        onClick={() => setActiveProfile(profile)}
+                      >
+                        {profile.cute_name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             
             {/* Main Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -539,39 +852,47 @@ const SkyblockDungeonTracker = () => {
                 </div>
                 
                 {/* Class Levels */}
-                <h3 className="text-lg font-medium mb-3">Class Levels</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {getClassData().map((classData) => (
-                    <div 
-                      key={classData.name}
-                      className={`bg-tertiary p-4 rounded-lg border ${classData.selected ? 'border-ui-warning' : 'border-accent'} transition hover:shadow-card-hover`}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center">
-                          {getClassIcon(classData.name)}
-                          <span className="ml-2 capitalize font-medium">{classData.displayName}</span>
-                        </div>
-                        <div 
-                          className={`text-2xl font-bold ${getRarityColorClass(classData.level)}`}
-                        >
-                          {classData.level}
-                        </div>
-                      </div>
-                      <div className="w-full bg-primary rounded-full h-2 mb-2">
-                        <div 
-                          className={`h-2 rounded-full ${getClassColorClass(classData.name)}`}
-                          style={{ 
-                            width: `${classData.progress * 100}%`,
-                            backgroundColor: 'currentColor'
-                          }}
-                        ></div>
-                      </div>
-                      <div className="text-sm text-text-secondary flex justify-between">
-                        <span>{Math.round(classData.progress * 100)}%</span>
-                        <span>{formatNumber(classData.experience)} XP</span>
-                      </div>
+                <div className="bg-tertiary rounded-lg p-4 border border-accent mb-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-lg font-medium">Class Levels</h3>
+                    <div className="text-lg font-bold flex items-center">
+                      <span className="text-sm text-text-secondary mr-2">Average:</span>
+                      <span className={getRarityColorClass(parseFloat(getClassAverage()))}>{getClassAverage()}</span>
                     </div>
-                  ))}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {getClassData().map((classData) => (
+                      <div 
+                        key={classData.name}
+                        className={`bg-secondary p-3 rounded-lg border ${classData.selected ? 'border-ui-warning' : 'border-accent'} transition hover:shadow-card-hover`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center">
+                            {getClassIcon(classData.name)}
+                            <span className="ml-2 capitalize font-medium">{classData.displayName}</span>
+                          </div>
+                          <div 
+                            className={`text-2xl font-bold ${getRarityColorClass(classData.level)}`}
+                          >
+                            {classData.level}
+                          </div>
+                        </div>
+                        <div className="w-full bg-primary rounded-full h-2 mb-2">
+                          <div 
+                            className={`h-2 rounded-full ${getClassColorClass(classData.name)}`}
+                            style={{ 
+                              width: `${classData.progress * 100}%`,
+                              backgroundColor: 'currentColor'
+                            }}
+                          ></div>
+                        </div>
+                        <div className="text-sm text-text-secondary flex justify-between">
+                          <span>{Math.round(classData.progress * 100)}%</span>
+                          <span>{formatNumber(classData.experience)} XP</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
               
@@ -581,7 +902,6 @@ const SkyblockDungeonTracker = () => {
                   <FlaskConical className="mr-2 text-class-mage" />
                   <span>Dungeon Statistics</span>
                 </h2>
-                
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   <div className="bg-tertiary rounded-lg p-4 border border-accent">
                     <h3 className="text-lg font-medium mb-3 text-mode-normal">Normal Mode</h3>
@@ -650,21 +970,23 @@ const SkyblockDungeonTracker = () => {
                       </div>
                     </div>
                     <div className="bg-secondary p-3 rounded-lg">
-                      <div className="text-xs text-text-secondary">Best F7 S+ Time</div>
+                      <div className="text-xs text-text-secondary">Secrets Per Run</div>
                       <div className="font-bold text-lg">
-                        {formatTime(getDungeonsData()?.catacombs?.floors?.[7]?.stats?.fastest_time_s_plus || 0)}
+                        {getSecretsPerRun()}
                       </div>
                     </div>
                     <div className="bg-secondary p-3 rounded-lg">
-                      <div className="text-xs text-text-secondary">Best M7 S+ Time</div>
+                      <div className="text-xs text-text-secondary">Best F7 S+ Time</div>
                       <div className="font-bold text-lg">
-                        {formatTime(getDungeonsData()?.master_catacombs?.floors?.[7]?.stats?.fastest_time_s_plus || 0)}
+                        {formatTime(getDungeonsData()?.catacombs?.floors?.[7]?.stats?.fastest_time_s_plus || 0)}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+            
+
             
             {/* Floor Statistics */}
             <div className="mb-8">
@@ -693,7 +1015,6 @@ const SkyblockDungeonTracker = () => {
                       Master Mode
                     </button>
                   </div>
-                  
                   {/* Floor Buttons */}
                   <div className="flex flex-wrap gap-2 mb-4">
                     {getFloorKeys().map((floor) => (
@@ -879,6 +1200,171 @@ const SkyblockDungeonTracker = () => {
                 </>
               )}
             </div>
+
+                        {/* Dungeon Weight Explanation */}
+                        <div className="bg-secondary rounded-lg p-5 shadow-card border border-accent mb-8">
+              <h2 className="text-2xl font-bold flex items-center mb-4">
+                <BrainCircuit className="mr-2 text-ui-warning" />
+                <span>Dungeon Weight System</span>
+              </h2>
+
+              <div className="bg-tertiary p-4 rounded-lg">
+                <p className="text-sm mb-2">
+                  Dungeon Weight is a comprehensive metric that precisely measures your dungeon progression.
+                  A score of 1000 represents the theoretical maximum achievable with perfect stats across all categories.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div className="bg-secondary p-3 rounded-lg">
+                    <h3 className="text-lg font-semibold mb-2 text-ui-primary">Weight Distribution</h3>
+                    <ul className="space-y-2 text-sm">
+                      <li className="flex justify-between">
+                        <span>Catacombs Level (max 50)</span>
+                        <span className="font-medium">300 points</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span>Class Levels (all classes)</span>
+                        <span className="font-medium">250 points</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span>Secrets Found</span>
+                        <span className="font-medium">200 points</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span>Completions</span>
+                        <span className="font-medium">150 points</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span>Master Mode Progress</span>
+                        <span className="font-medium">50 points</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span>Perfect Scores</span>
+                        <span className="font-medium">20 points</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span>All Floors Completed</span>
+                        <span className="font-medium">30 points</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-secondary p-3 rounded-lg">
+                    <h3 className="text-lg font-semibold mb-2 text-ui-info">Progression Stages</h3>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                        <div className="flex justify-between w-full">
+                          <span>Early Game</span>
+                          <span className="font-medium">0-100</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 rounded-full bg-yellow-600 mr-2"></div>
+                        <div className="flex justify-between w-full">
+                          <span>Early-Mid Game</span>
+                          <span className="font-medium">100-300</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                        <div className="flex justify-between w-full">
+                          <span>Mid Game</span>
+                          <span className="font-medium">300-500</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                        <div className="flex justify-between w-full">
+                          <span>Late Game</span>
+                          <span className="font-medium">500-700</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 rounded-full bg-purple-400 mr-2"></div>
+                        <div className="flex justify-between w-full">
+                          <span>Late Endgame</span>
+                          <span className="font-medium">700-900</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 rounded-full bg-purple-600 mr-2"></div>
+                        <div className="flex justify-between w-full">
+                          <span>Endgame / Maxed</span>
+                          <span className="font-medium">900+</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-4 bg-secondary p-3 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-2 text-ui-success">Your Dungeon Weight</h3>
+                  <div className="flex flex-col md:flex-row items-center">
+                    <div className="w-full h-6 bg-tertiary rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full ${getDungeonWeightColor()}`} 
+                        style={{ width: `${Math.min(100, calculateDungeonWeight() / 10)}%` }}
+                      ></div>
+                    </div>
+                    <div className="mt-2 md:mt-0 md:ml-4 font-bold text-xl">
+                      {calculateDungeonWeight()}
+                      <span className="text-text-secondary"> / 1000</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-4 bg-secondary p-3 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-2 flex items-center">
+                    <Info size={16} className="mr-2 text-ui-info" />
+                    Advanced Scoring Details
+                  </h3>
+                  <p className="text-xs text-text-secondary mb-1">
+                    The system uses proportional scaling with minor bonuses for exceptional achievements:
+                  </p>
+                  <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div className="bg-primary p-2 rounded">
+                      <div className="font-semibold mb-1 text-ui-primary">Catacombs (300 pts)</div>
+                      <div>• Linear scaling with level</div>
+                      <div>• Catacombs 50 = 300 points</div>
+                    </div>
+                    
+                    <div className="bg-primary p-2 rounded">
+                      <div className="font-semibold mb-1 text-ui-primary">Classes (250 pts)</div>
+                      <div>• Total level contribution (150 pts)</div>
+                      <div>• Average level contribution (100 pts)</div>
+                      <div>• Rewards balanced class progression</div>
+                    </div>
+                    
+                    <div className="bg-primary p-2 rounded">
+                      <div className="font-semibold mb-1 text-ui-primary">Secrets (200 pts)</div>
+                      <div>• Logarithmic scaling (diminishing returns)</div>
+                      <div>• Reference: 150,000 secrets = 200 pts</div>
+                      <div>• Biased toward quality over quantity</div>
+                    </div>
+                    
+                    <div className="bg-primary p-2 rounded">
+                      <div className="font-semibold mb-1 text-ui-primary">Completions (150 pts)</div>
+                      <div>• Logarithmic scaling</div>
+                      <div>• Reference: 10,000 completions = 150 pts</div>
+                    </div>
+                    
+                    <div className="bg-primary p-2 rounded">
+                      <div className="font-semibold mb-1 text-ui-primary">Master Mode (50 pts)</div>
+                      <div>• Points awarded per floor</div>
+                      <div>• Higher floors worth more points</div>
+                      <div>• Scales with completion count</div>
+                    </div>
+                    
+                    <div className="bg-primary p-2 rounded">
+                      <div className="font-semibold mb-1 text-ui-primary">Bonuses (50 pts)</div>
+                      <div>• Perfect scores (up to 20 pts)</div>
+                      <div>• All floors completed (30 pts)</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             
             {/* Essence Collection */}
             {getDungeonsData().essence && Object.keys(getDungeonsData().essence).length > 0 && (
@@ -936,20 +1422,30 @@ const SkyblockDungeonTracker = () => {
 
               <div className="mt-6 bg-tertiary p-4 rounded-lg">
                 <h3 className="text-lg font-semibold mb-2">Score Tiers</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="flex items-center">
-                    <div className="w-4 h-4 rounded-full bg-white mr-2"></div>
-                    <span>Less than 100: No reward bonus</span>
+                    <div className="w-4 h-4 rounded-full mr-2 bg-score-c"></div>
+                    <span>C: Less than 100</span>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 rounded-full mr-2 bg-score-b"></div>
+                    <span>B: 100-199</span>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 rounded-full mr-2 bg-score-a"></div>
+                    <span>A: 200-269</span>
                   </div>
 
                   <div className="flex items-center">
                     <div className="w-4 h-4 rounded-full mr-2 bg-score-s"></div>
-                    <span>S: 270+ score (50% reward bonus)</span>
+                    <span>S: 270-299</span>
                   </div>
 
                   <div className="flex items-center">
                     <div className="w-4 h-4 rounded-full mr-2 bg-score-splus"></div>
-                    <span>S+: 300+ score (100% reward bonus)</span>
+                    <span>S+: 300+</span>
                   </div>
                 </div>
               </div>
