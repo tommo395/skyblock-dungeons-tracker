@@ -1,70 +1,110 @@
-# Getting Started with Create React App
+# Skyblock Dungeons Tracker
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://skyblock-dungeons-tracker.vercel.app/)
+[![Made with React](https://img.shields.io/badge/React-18-blue)](https://reactjs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-38B2AC)](https://tailwindcss.com/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-## Available Scripts
+A comprehensive stat tracking and visualization tool for Hypixel Skyblock Dungeons players. View detailed performance metrics, track progression, and analyze your dungeon statistics with an intuitive and responsive interface.
 
-In the project directory, you can run:
+![Skyblock Dungeons Tracker Screenshot](https://via.placeholder.com/800x450?text=Skyblock+Dungeons+Tracker+Screenshot)
 
-### `npm start`
+## 🌟 Features
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **Real-time Data**: Fetch and display up-to-date dungeon statistics for any Hypixel Skyblock player
+- **Comprehensive Analytics**: Track catacombs level, class levels, secrets, completions, and more
+- **Performance Insights**: View detailed floor-specific metrics including fastest times, best scores, and highest damage
+- **Shareable Links**: Easily share player statistics through URL parameters
+- **Dungeon Weight**: Custom metric to evaluate overall dungeon progression across multiple factors
+- **Mobile-Friendly**: Fully responsive design works seamlessly on devices of all sizes
+- **Dark Mode**: Eye-friendly interface for extended gaming sessions
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 📊 Dungeon Weight System
 
-### `npm test`
+The Skyblock Dungeons Tracker features a unique "Dungeon Weight" scoring system that measures overall dungeon progression on a scale approaching 1000:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **Catacombs Level**: Up to 300 points - scales linearly with level
+- **Class Levels**: Up to 250 points - rewards balanced class progression
+- **Secrets Found**: Up to 200 points - logarithmic scaling
+- **Completions**: Up to 150 points - logarithmic scaling
+- **Master Mode**: Up to 50 points - varies based on floor difficulty
+- **Perfect Scores**: Up to 20 points - bonus for S+ completions
+- **All Floors**: 30 points bonus for completing all floor types
 
-### `npm run build`
+This system provides a comprehensive single-number metric that accurately represents progression from early to endgame.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 🚀 Getting Started
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Live Demo
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+The easiest way to use the tracker is through the live deployment:
+[https://skyblock-dungeons-tracker.vercel.app/](https://skyblock-dungeons-tracker.vercel.app/)
 
-### `npm run eject`
+### Running Locally
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/skyblock-dungeons-tracker.git
+   cd skyblock-dungeons-tracker
+   ```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+4. Open your browser and navigate to `http://localhost:3000`
 
-## Learn More
+## 🔧 Tech Stack
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- **Frontend**: React.js, Tailwind CSS
+- **API Integration**: Fetch API with sky.shiiyu.moe API
+- **Visualization**: Custom React components
+- **Deployment**: Vercel
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 📱 Usage Examples
 
-### Code Splitting
+### View Player Stats
+- Enter any valid Hypixel Skyblock player IGN in the search bar
+- Click search or press Enter
+- View comprehensive statistics organized by category
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Share Player Stats
+- Search for a player to load their stats
+- Copy the URL (automatically updated with player name parameter)
+- Share with friends or discord communities
 
-### Analyzing the Bundle Size
+### Compare Multiple Players
+- Open multiple browser tabs with different player stats
+- Use the dungeon weight metric as a comparative benchmark
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## 🤝 Contributing
 
-### Making a Progressive Web App
+Contributions are welcome! If you have ideas for improvements or new features:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-### Advanced Configuration
+## 📄 License
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Deployment
+## 🙏 Acknowledgements
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+- Data provided by the [sky.shiiyu.moe API](https://sky.shiiyu.moe/)
+- Inspired by the Hypixel Skyblock community
+- Special thanks to the early testers and contributors
 
-### `npm run build` fails to minify
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+*This project is not affiliated with Hypixel, Mojang, or Microsoft. All Minecraft and Hypixel Skyblock related content belongs to their respective owners.*
+
+© 2023-2025 Skyblock Dungeons Tracker
