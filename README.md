@@ -7,7 +7,6 @@
 
 A comprehensive stat tracking and visualization tool for Hypixel Skyblock Dungeons players. View detailed performance metrics, track progression, and analyze your dungeon statistics with an intuitive and responsive interface.
 
-![Skyblock Dungeons Tracker Screenshot](https://via.placeholder.com/800x450?text=Skyblock+Dungeons+Tracker+Screenshot)
 
 ## 🌟 Features
 
