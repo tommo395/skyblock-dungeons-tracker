@@ -6,24 +6,22 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Base backgrounds
-        primary: '#0f172a',     // Dark blue background
-        secondary: '#1e293b',   // Slightly lighter blue
-        tertiary: '#334155',    // Even lighter blue accent
-        accent: '#475569',      // Border color
+        // Theme-based color system
+        primary: 'var(--color-primary)',
+        secondary: 'var(--color-secondary)',
+        tertiary: 'var(--color-tertiary)',
+        accent: 'var(--color-accent)',
+        "text-primary": 'var(--color-text-primary)',
+        "text-secondary": 'var(--color-text-secondary)',
+        "text-tertiary": 'var(--color-text-tertiary)',
 
-        // Text colors
-        "text-primary": '#f8fafc',   // Almost white
-        "text-secondary": '#94a3b8', // Light gray
-        "text-tertiary": '#64748b',  // Darker gray
-        
         // Class colors
-        "class-archer": '#84cc16',   // Green
-        "class-mage": '#a855f7',     // Purple
-        "class-tank": '#06b6d4',     // Cyan
-        "class-berserk": '#ef4444',  // Red
-        "class-healer": '#eab308',   // Yellow
-        
+        "class-archer": '#84cc16', // Green
+        "class-mage": '#a855f7', // Purple
+        "class-tank": '#06b6d4', // Cyan
+        "class-berserk": '#ef4444', // Red
+        "class-healer": '#eab308', // Yellow
+
         // Rarity colors
         "rarity-common": '#aaaaaa',
         "rarity-uncommon": '#55ff55',
@@ -31,24 +29,24 @@ module.exports = {
         "rarity-epic": '#aa00aa',
         "rarity-legendary": '#ffaa00',
         "rarity-mythic": '#ff55ff',
-        
+
         // Score colors
         "score-splus": '#aa00aa',
         "score-s": '#ffaa00',
         "score-a": '#55ff55',
         "score-b": '#5555ff',
         "score-c": '#aaaaaa',
-        
+
         // UI colors
-        "ui-primary": '#3b82f6',     // Blue
-        "ui-success": '#10b981',     // Green
-        "ui-warning": '#f59e0b',     // Amber
-        "ui-danger": '#ef4444',      // Red
-        "ui-info": '#06b6d4',        // Cyan
-        
+        "ui-primary": '#3b82f6', // Blue
+        "ui-success": '#10b981', // Green
+        "ui-warning": '#f59e0b', // Amber
+        "ui-danger": '#ef4444', // Red
+        "ui-info": '#06b6d4', // Cyan
+
         // Mode colors
-        "mode-normal": '#3b82f6',    // Blue for normal mode
-        "mode-master": '#dc2626',    // Red for master mode
+        "mode-normal": '#3b82f6', // Blue for normal mode
+        "mode-master": '#dc2626', // Red for master mode
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

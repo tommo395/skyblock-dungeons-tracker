@@ -1,0 +1,146 @@
+/* theme.css */
+:root {
+    --theme-transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  }
+  
+  * {
+    transition: var(--theme-transition);
+  }
+  
+  body {
+    background-color: var(--color-primary);
+    color: var(--color-text-primary);
+    transition: var(--theme-transition);
+  }
+  
+  /* Original Dark Blue */
+  .theme-classic {
+    --color-primary: #0f172a;
+    --color-secondary: #1e293b;
+    --color-tertiary: #334155;
+    --color-accent: #475569;
+    --color-text-primary: #f8fafc;
+    --color-text-secondary: #94a3b8;
+    --color-text-tertiary: #64748b;
+  }
+
+  
+  /* Light Mode */
+  .theme-light {
+    --color-primary: #f8fafc;
+    --color-secondary: #e2e8f0;
+    --color-tertiary: #cbd5e1;
+    --color-accent: #94a3b8;
+    --color-text-primary: #0f172a;
+    --color-text-secondary: #334155;
+    --color-text-tertiary: #64748b;
+  }
+  
+
+  /* Hypixel Theme */
+  .theme-hypixel {
+    --color-primary: #0e1823;      /* Dark blue from Hypixel website */
+    --color-secondary: #1a2c3d;    /* Medium blue */
+    --color-tertiary: #25405a;     /* Lighter blue */
+    --color-accent: #ffac0f;       /* Hypixel gold/yellow */
+    --color-text-primary: #ffffff;
+    --color-text-secondary: #d0d9e2;
+    --color-text-tertiary: #95a4b8;
+  }
+  
+  /* Outlined/Wireframe */
+  .theme-outline {
+    --color-primary: #000000;
+    --color-secondary: #111111;
+    --color-tertiary: #222222;
+    --color-accent: #444444;
+    --color-text-primary: #ffffff;
+    --color-text-secondary: #cccccc;
+    --color-text-tertiary: #999999;
+  }
+  
+  .theme-outline .bg-secondary,
+  .theme-outline .bg-tertiary {
+    background-color: transparent !important;
+    border: 1px solid var(--color-accent) !important;
+  }
+  
+  .theme-chip {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    margin-bottom: 0.5rem;
+  }
+  
+  .theme-chip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .theme-chip.active {
+    box-shadow: 0 0 0 2px var(--color-accent);
+  }
+  
+  .theme-chip .theme-preview {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    margin-right: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .theme-chip .theme-name {
+    font-weight: 500;
+  }
+  
+  /* Minecraft-style theme preview */
+  .theme-preview.minecraft {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .theme-preview.minecraft::before {
+    content: "";
+    height: 60%;
+    background-color: #5a7348;
+  }
+  
+  .theme-preview.minecraft::after {
+    content: "";
+    height: 40%;
+    background-color: #614b36;
+  }
+  
+  /* Nether-style theme preview */
+  .theme-preview.nether {
+    background-color: #3b1c17;
+  }
+  
+  .theme-preview.nether::before {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #cc4c3b 25%, transparent 25%),
+                linear-gradient(225deg, #cc4c3b 25%, transparent 25%);
+    background-size: 6px 6px;
+    opacity: 0.6;
+  }
+  
+  /* End-style theme preview */
+  .theme-preview.end {
+    background-color: #0a090d;
+  }
+  
+  .theme-preview.end::before {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, #9457eb 10%, transparent 10%);
+    background-size: 6px 6px;
+  }
