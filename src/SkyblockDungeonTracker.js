@@ -25,6 +25,11 @@ import {
   Calculator,
   Palette,
   Coins,
+  Users,
+  PlusCircle,
+  Trash2,
+  BarChart2,
+  ArrowLeft,
 } from "lucide-react";
 import "./theme.css"; // We'll create this file next
 
@@ -50,6 +55,14 @@ const SkyblockDungeonTracker = () => {
   const [networkValue, setNetworkValue] = useState(null);
   const [currentTheme, setCurrentTheme] = useState("classic");
   const searchInputRef = useRef(null);
+  
+  // Comparison mode state
+  const [viewMode, setViewMode] = useState("single"); // "single" or "compare"
+  const [comparedPlayers, setComparedPlayers] = useState([]);
+  const [comparisonInput, setComparisonInput] = useState("");
+  const [loadingComparison, setLoadingComparison] = useState(false);
+  const [comparisonError, setComparisonError] = useState("");
+  const [activeComparisonTab, setActiveComparisonTab] = useState("overview"); // "overview", "levels", "floors", "weight"
 
   // Update themes array with creative options
   const themes = [
@@ -93,6 +106,7 @@ const SkyblockDungeonTracker = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const playerFromUrl = urlParams.get("player");
     const themeFromUrl = urlParams.get("theme");
+    const compareParam = urlParams.get("compare");
 
     if (themeFromUrl && themes.some((theme) => theme.id === themeFromUrl)) {
       setCurrentTheme(themeFromUrl);
@@ -101,6 +115,21 @@ const SkyblockDungeonTracker = () => {
     if (playerFromUrl) {
       setPlayerNameInput(playerFromUrl);
       fetchPlayerData(playerFromUrl);
+    }
+    
+    // Handle comparison players from URL
+    if (compareParam) {
+      const comparePlayers = compareParam.split(",").filter(Boolean);
+      if (comparePlayers.length > 0) {
+        setViewMode("compare");
+        Promise.all(comparePlayers.map(fetchPlayerDataForComparison))
+          .then(results => {
+            const validPlayers = results.filter(Boolean);
+            if (validPlayers.length > 0) {
+              setComparedPlayers(validPlayers);
+            }
+          });
+      }
     }
   }, []);
 
@@ -122,6 +151,18 @@ const SkyblockDungeonTracker = () => {
     url.searchParams.set("player", name);
     window.history.pushState({}, "", url);
   };
+  
+  // Update URL with comparison players
+  const updateUrlWithComparison = (players) => {
+    const url = new URL(window.location);
+    if (players.length > 0) {
+      const playerNames = players.map(p => p.name).join(",");
+      url.searchParams.set("compare", playerNames);
+    } else {
+      url.searchParams.delete("compare");
+    }
+    window.history.pushState({}, "", url);
+  };
 
   // Fetch player avatar
   const fetchPlayerAvatar = async (name) => {
@@ -129,9 +170,11 @@ const SkyblockDungeonTracker = () => {
       // Use Minecraft API to get player avatar
       const avatarUrl = `https://mc-heads.net/avatar/${name}/64`;
       setPlayerAvatar(avatarUrl);
+      return avatarUrl;
     } catch (err) {
       console.error("Failed to fetch player avatar:", err);
       setPlayerAvatar(null);
+      return null;
     }
   };
 
@@ -191,10 +234,66 @@ const SkyblockDungeonTracker = () => {
       }
 
       setStatsLoaded(true);
+      return data;
     } catch (err) {
       setError(err.message || "Failed to fetch player data");
+      return null;
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // Fetch player data for comparison
+  const fetchPlayerDataForComparison = async (name) => {
+    if (!name) return null;
+    
+    setLoadingComparison(true);
+    setComparisonError("");
+
+    try {
+      const avatarUrl = await fetchPlayerAvatar(name);
+      
+      const response = await fetch(
+        `https://sky.shiiyu.moe/api/v2/dungeons/${name}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch player data: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.profiles || Object.keys(data.profiles).length === 0) {
+        throw new Error("No profiles found for this player");
+      }
+      
+      // Find the active profile
+      const activeProfileKey =
+        Object.keys(data.profiles).find(
+          (key) => data.profiles[key].selected === true
+        ) || Object.keys(data.profiles)[0];
+      
+      const profileData = data.profiles[activeProfileKey];
+      
+      // Return formatted player data for comparison
+      return {
+        name: name,
+        avatar: avatarUrl,
+        data: data,
+        profile: profileData,
+        weight: calculateDungeonWeight(profileData),
+        cataLevel: getCatacombsLevel(profileData)?.level || 0,
+        classAvg: getClassAverage(profileData),
+        secretsFound: getSecretsFound(profileData),
+        completions: getTotalCompletions(profileData),
+        fastestF7: formatTime(profileData.dungeons?.catacombs?.floors?.[7]?.stats?.fastest_time || 0),
+        fastestM7: formatTime(profileData.dungeons?.master_catacombs?.floors?.[7]?.stats?.fastest_time || 0),
+      };
+    } catch (err) {
+      setComparisonError(err.message || "Failed to fetch player data");
+      return null;
+    } finally {
+      setLoadingComparison(false);
     }
   };
 
@@ -249,6 +348,67 @@ const SkyblockDungeonTracker = () => {
     if (searchInputRef.current) {
       searchInputRef.current.focus();
     }
+  };
+  
+  // Handle comparison form submission
+  const handleComparisonSubmit = async (e) => {
+    e.preventDefault();
+    if (!comparisonInput) return;
+    
+    // Check if player is already in the comparison list
+    if (comparedPlayers.some(p => p.name.toLowerCase() === comparisonInput.toLowerCase())) {
+      setComparisonError("Player already in comparison list");
+      return;
+    }
+    
+    const playerData = await fetchPlayerDataForComparison(comparisonInput);
+    if (playerData) {
+      const newPlayers = [...comparedPlayers, playerData];
+      setComparedPlayers(newPlayers);
+      setComparisonInput("");
+      updateUrlWithComparison(newPlayers);
+    }
+  };
+  
+  // Remove player from comparison
+  const removeFromComparison = (name) => {
+    const newPlayers = comparedPlayers.filter(p => p.name !== name);
+    setComparedPlayers(newPlayers);
+    updateUrlWithComparison(newPlayers);
+    
+    // If no players left in comparison, switch back to single view
+    if (newPlayers.length === 0) {
+      setViewMode("single");
+    }
+  };
+  
+  // Add current player to comparison
+  const addCurrentPlayerToComparison = () => {
+    if (!playerData || !activeProfile) return;
+    
+    // Check if player is already in comparison
+    if (comparedPlayers.some(p => p.name.toLowerCase() === displayName.toLowerCase())) {
+      return;
+    }
+    
+    const playerForComparison = {
+      name: displayName,
+      avatar: playerAvatar,
+      data: playerData,
+      profile: activeProfile,
+      weight: calculateDungeonWeight(),
+      cataLevel: getCatacombsLevel().level,
+      classAvg: getClassAverage(),
+      secretsFound: getSecretsFound(),
+      completions: getTotalCompletions(),
+      fastestF7: getFastestF7Time(),
+      fastestM7: getFastestM7Time(),
+    };
+    
+    const newPlayers = [...comparedPlayers, playerForComparison];
+    setComparedPlayers(newPlayers);
+    setViewMode("compare");
+    updateUrlWithComparison(newPlayers);
   };
 
   // Function to get class icon with appropriate coloring
@@ -308,11 +468,11 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Get dungeons data from active profile
-  const getDungeonsData = () => {
-    if (!activeProfile || !activeProfile.dungeons) {
+  const getDungeonsData = (profile = activeProfile) => {
+    if (!profile || !profile.dungeons) {
       return null;
     }
-    return activeProfile.dungeons;
+    return profile.dungeons;
   };
 
   // Get catacombs data
@@ -326,8 +486,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Get catacombs level
-  const getCatacombsLevel = () => {
-    const dungeons = getDungeonsData();
+  const getCatacombsLevel = (profile = activeProfile) => {
+    const dungeons = getDungeonsData(profile);
     if (!dungeons) return { level: 0, progress: 0 };
 
     const catacombs = dungeons.catacombs;
@@ -363,8 +523,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Get class data
-  const getClassData = () => {
-    const dungeons = getDungeonsData();
+  const getClassData = (profile = activeProfile) => {
+    const dungeons = getDungeonsData(profile);
     if (!dungeons || !dungeons.classes) return [];
 
     // Extract class data from the API response - handle nested structure
@@ -405,8 +565,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Calculate class average
-  const getClassAverage = () => {
-    const classData = getClassData();
+  const getClassAverage = (profile = activeProfile) => {
+    const classData = getClassData(profile);
     if (!classData || classData.length === 0) return 0;
 
     const totalLevels = classData.reduce((sum, cls) => sum + cls.level, 0);
@@ -414,8 +574,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Get total completions
-  const getTotalCompletions = () => {
-    const dungeons = getDungeonsData();
+  const getTotalCompletions = (profile = activeProfile) => {
+    const dungeons = getDungeonsData(profile);
     if (!dungeons) return 0;
 
     // Calculate manually from all floors and modes
@@ -443,25 +603,25 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Get secrets found
-  const getSecretsFound = () => {
-    const dungeons = getDungeonsData();
+  const getSecretsFound = (profile = activeProfile) => {
+    const dungeons = getDungeonsData(profile);
     if (!dungeons) return 0;
 
     return dungeons.secrets_found || 0;
   };
 
   // Get secrets per run
-  const getSecretsPerRun = () => {
-    const totalSecrets = getSecretsFound();
-    const totalRuns = getTotalCompletions();
+  const getSecretsPerRun = (profile = activeProfile) => {
+    const totalSecrets = getSecretsFound(profile);
+    const totalRuns = getTotalCompletions(profile);
 
     if (!totalRuns) return 0;
     return (totalSecrets / totalRuns).toFixed(2);
   };
 
   // Calculate dungeon weight with no artificial cap - 1000 is achievable only with perfect stats
-  const calculateDungeonWeight = () => {
-    if (!getDungeonsData()) return 0;
+  const calculateDungeonWeight = (profile = activeProfile) => {
+    if (!getDungeonsData(profile)) return 0;
 
     // Max level references - perfect theoretical stats
     const MAX_CATA_LEVEL = 50;
@@ -473,11 +633,11 @@ const SkyblockDungeonTracker = () => {
     const ENDGAME_COMPLETIONS = 10000;
 
     // Get actual player values
-    const catacombsLevel = getCatacombsLevel().level;
-    const catacombsXp = getCatacombsLevel().totalXp || 0;
-    const classData = getClassData();
-    const secretsFound = getSecretsFound();
-    const totalCompletions = getTotalCompletions();
+    const catacombsLevel = getCatacombsLevel(profile).level;
+    const catacombsXp = getCatacombsLevel(profile).totalXp || 0;
+    const classData = getClassData(profile);
+    const secretsFound = getSecretsFound(profile);
+    const totalCompletions = getTotalCompletions(profile);
 
     // Component weights - set so theoretical perfect player would score exactly 1000
     const catacombsComponent = (catacombsLevel / MAX_CATA_LEVEL) * 300;
@@ -507,13 +667,13 @@ const SkyblockDungeonTracker = () => {
     const completionsComponent = Math.pow(completionsRatio, 0.7) * 150;
 
     // Master Mode bonus - extra weight for master mode progress
-    const masterModeComponent = calculateMasterModeWeight();
+    const masterModeComponent = calculateMasterModeWeight(profile);
 
     // "Perfect score" bonuses - small boosts for perfect achievements
-    const perfectScoreComponent = calculatePerfectScoreBonus();
+    const perfectScoreComponent = calculatePerfectScoreBonus(profile);
 
     // Floor completion bonus
-    const floorCompletionBonus = hasCompletedAllFloors() ? 30 : 0;
+    const floorCompletionBonus = hasCompletedAllFloors(profile) ? 30 : 0;
 
     // Sum all components - will naturally approach 1000 as player approaches perfect stats
     const totalWeight =
@@ -530,8 +690,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Calculate master mode weight component (up to 50 points)
-  const calculateMasterModeWeight = () => {
-    const dungeons = getDungeonsData();
+  const calculateMasterModeWeight = (profile = activeProfile) => {
+    const dungeons = getDungeonsData(profile);
     if (
       !dungeons ||
       !dungeons.master_catacombs ||
@@ -559,8 +719,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Calculate bonus for perfect scores (up to 20 points)
-  const calculatePerfectScoreBonus = () => {
-    const dungeons = getDungeonsData();
+  const calculatePerfectScoreBonus = (profile = activeProfile) => {
+    const dungeons = getDungeonsData(profile);
     if (!dungeons) return 0;
 
     let totalBonus = 0;
@@ -589,8 +749,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Helper function to check if player has completed all floors
-  const hasCompletedAllFloors = () => {
-    const dungeons = getDungeonsData();
+  const hasCompletedAllFloors = (profile = activeProfile) => {
+    const dungeons = getDungeonsData(profile);
     if (!dungeons || !dungeons.catacombs || !dungeons.catacombs.floors)
       return false;
 
@@ -627,8 +787,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Helper function to get color class based on dungeon weight
-  const getDungeonWeightColor = () => {
-    const weight = calculateDungeonWeight();
+  const getDungeonWeightColor = (weight) => {
+    if (!weight) weight = calculateDungeonWeight();
 
     if (weight >= 900) return "bg-purple-600"; // Endgame
     if (weight >= 700) return "bg-purple-400"; // Late endgame
@@ -639,8 +799,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Get highest floor
-  const getHighestFloor = (mode = "catacombs") => {
-    const dungeons = getDungeonsData();
+  const getHighestFloor = (mode = "catacombs", profile = activeProfile) => {
+    const dungeons = getDungeonsData(profile);
     if (!dungeons) return "None";
 
     const dungeonType =
@@ -652,8 +812,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Get fastest F7 time
-  const getFastestF7Time = () => {
-    const dungeons = getDungeonsData();
+  const getFastestF7Time = (profile = activeProfile) => {
+    const dungeons = getDungeonsData(profile);
     if (!dungeons) return "N/A";
 
     const f7Data = dungeons.catacombs?.floors?.[7];
@@ -663,8 +823,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Get fastest M7 time
-  const getFastestM7Time = () => {
-    const dungeons = getDungeonsData();
+  const getFastestM7Time = (profile = activeProfile) => {
+    const dungeons = getDungeonsData(profile);
     if (!dungeons) return "N/A";
 
     const m7Data = dungeons.master_catacombs?.floors?.[7];
@@ -674,8 +834,8 @@ const SkyblockDungeonTracker = () => {
   };
 
   // Get most played floor
-  const getMostPlayedFloor = (mode = "catacombs") => {
-    const dungeons = getDungeonsData();
+  const getMostPlayedFloor = (mode = "catacombs", profile = activeProfile) => {
+    const dungeons = getDungeonsData(profile);
     if (!dungeons) return "None";
 
     const dungeonType =
@@ -798,6 +958,531 @@ const SkyblockDungeonTracker = () => {
       </div>
     );
   };
+  
+  // Comparison component
+  const PlayerComparison = () => {
+    return (
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <Users className="mr-2 text-ui-warning" size={24} />
+            <h2 className="text-2xl font-bold">Player Comparison</h2>
+          </div>
+          <button 
+            onClick={() => setViewMode("single")}
+            className="flex items-center bg-tertiary px-3 py-1.5 rounded-md hover:bg-accent transition"
+          >
+            <ArrowLeft size={16} className="mr-2" />
+            <span>Back to Single View</span>
+          </button>
+        </div>
+        
+        {/* Player selection area */}
+        <div className="bg-secondary p-4 rounded-lg mb-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <form 
+              onSubmit={handleComparisonSubmit}
+              className="flex-grow flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={comparisonInput}
+                onChange={(e) => setComparisonInput(e.target.value)}
+                placeholder="Add player to comparison"
+                className="w-full bg-tertiary text-text-primary px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-ui-primary"
+              />
+              <button
+                type="submit"
+                className="bg-ui-primary text-text-primary px-4 py-2 rounded hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-ui-primary disabled:opacity-50 transition"
+                disabled={loadingComparison || !comparisonInput}
+              >
+                {loadingComparison ? (
+                  <Loader size={18} className="animate-spin" />
+                ) : (
+                  <PlusCircle size={18} />
+                )}
+              </button>
+            </form>
+            
+            {/* Quick add buttons */}
+            <div className="flex gap-2 flex-wrap">
+              {demoPlayers.map((player) => (
+                <button
+                  key={player.name}
+                  onClick={() => fetchPlayerDataForComparison(player.name).then(data => {
+                    if (data && !comparedPlayers.some(p => p.name === player.name)) {
+                      setComparedPlayers([...comparedPlayers, data]);
+                      updateUrlWithComparison([...comparedPlayers, data]);
+                    }
+                  })}
+                  className="px-2 py-1 bg-tertiary hover:bg-accent rounded text-sm flex items-center transition"
+                  disabled={comparedPlayers.some(p => p.name === player.name)}
+                >
+                  <span>{player.name}</span>
+                </button>
+              ))}
+              
+              {statsLoaded && playerData && displayName && (
+                <button
+                  onClick={addCurrentPlayerToComparison}
+                  className="px-2 py-1 bg-ui-primary hover:bg-opacity-90 rounded text-sm flex items-center transition"
+                  disabled={comparedPlayers.some(p => p.name === displayName)}
+                >
+                  <span>+ Add Current Player</span>
+                </button>
+              )}
+            </div>
+          </div>
+          
+          {comparisonError && (
+            <div className="mt-2 p-2 bg-ui-danger bg-opacity-30 border border-ui-danger text-text-primary rounded flex items-start">
+              <AlertTriangle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
+              <span>{comparisonError}</span>
+            </div>
+          )}
+        </div>
+        
+        {/* Player cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          {comparedPlayers.map((player) => (
+            <div key={player.name} className="bg-secondary rounded-lg p-4 shadow-card border border-accent relative">
+              <button 
+                onClick={() => removeFromComparison(player.name)}
+                className="absolute top-2 right-2 p-1 bg-tertiary rounded-full hover:bg-ui-danger hover:text-text-primary transition"
+              >
+                <Trash2 size={16} />
+              </button>
+              
+              <div className="flex items-center mb-3">
+                {player.avatar && (
+                  <img 
+                    src={player.avatar} 
+                    alt={`${player.name}'s avatar`}
+                    className="w-12 h-12 rounded-lg border-2 border-ui-warning mr-3"
+                  />
+                )}
+                <div>
+                  <h3 className="text-xl font-bold">{player.name}</h3>
+                  <div className="flex items-center text-sm text-text-secondary">
+                    <div className={getDungeonWeightColor(player.weight)} style={{width: '8px', height: '8px', borderRadius: '50%', marginRight: '6px'}}></div>
+                    <span>Weight: {player.weight}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-tertiary p-2 rounded">
+                  <div className="text-xs text-text-secondary">Cata Level</div>
+                  <div className={`font-bold ${getRarityColorClass(player.cataLevel)}`}>
+                    {player.cataLevel}
+                  </div>
+                </div>
+                
+                <div className="bg-tertiary p-2 rounded">
+                  <div className="text-xs text-text-secondary">Class Avg</div>
+                  <div className="font-bold">
+                    {player.classAvg}
+                  </div>
+                </div>
+                
+                <div className="bg-tertiary p-2 rounded">
+                  <div className="text-xs text-text-secondary">Secrets</div>
+                  <div className="font-bold">
+                    {formatNumber(player.secretsFound)}
+                  </div>
+                </div>
+                
+                <div className="bg-tertiary p-2 rounded">
+                  <div className="text-xs text-text-secondary">Completions</div>
+                  <div className="font-bold">
+                    {formatNumber(player.completions)}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="bg-tertiary p-2 rounded">
+                  <div className="text-xs text-text-secondary">Best F7</div>
+                  <div className="font-bold">
+                    {player.fastestF7}
+                  </div>
+                </div>
+                
+                <div className="bg-tertiary p-2 rounded">
+                  <div className="text-xs text-text-secondary">Best M7</div>
+                  <div className="font-bold">
+                    {player.fastestM7}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Comparison Tabs */}
+        {comparedPlayers.length > 1 && (
+          <div className="mb-8">
+            <div className="flex overflow-x-auto mb-4">
+              <button
+                onClick={() => setActiveComparisonTab("overview")}
+                className={`px-4 py-2 font-medium rounded-t-lg transition ${
+                  activeComparisonTab === "overview" 
+                    ? "bg-ui-primary text-text-primary" 
+                    : "bg-tertiary text-text-secondary hover:bg-opacity-80"
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveComparisonTab("levels")}
+                className={`px-4 py-2 font-medium rounded-t-lg transition ${
+                  activeComparisonTab === "levels" 
+                    ? "bg-ui-primary text-text-primary" 
+                    : "bg-tertiary text-text-secondary hover:bg-opacity-80"
+                }`}
+              >
+                Class Levels
+              </button>
+              <button
+                onClick={() => setActiveComparisonTab("floors")}
+                className={`px-4 py-2 font-medium rounded-t-lg transition ${
+                  activeComparisonTab === "floors" 
+                    ? "bg-ui-primary text-text-primary" 
+                    : "bg-tertiary text-text-secondary hover:bg-opacity-80"
+                }`}
+              >
+                Floor Stats
+              </button>
+              <button
+                onClick={() => setActiveComparisonTab("weight")}
+                className={`px-4 py-2 font-medium rounded-t-lg transition ${
+                  activeComparisonTab === "weight" 
+                    ? "bg-ui-primary text-text-primary" 
+                    : "bg-tertiary text-text-secondary hover:bg-opacity-80"
+                }`}
+              >
+                Weight Analysis
+              </button>
+            </div>
+            
+            {/* Detailed comparison content based on active tab */}
+            <div className="bg-secondary p-5 rounded-lg shadow-card border border-accent">
+              {activeComparisonTab === "overview" && (
+                <div>
+                  <h3 className="text-xl font-bold mb-4">Player Overview Comparison</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-tertiary">
+                          <th className="p-2">Player</th>
+                          <th className="p-2">Cata Level</th>
+                          <th className="p-2">Class Avg</th>
+                          <th className="p-2">Secrets</th>
+                          <th className="p-2">Completions</th>
+                          <th className="p-2">Weight</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comparedPlayers.map((player) => (
+                          <tr key={player.name} className="border-t border-accent">
+                            <td className="p-2 flex items-center">
+                              {player.avatar && (
+                                <img 
+                                  src={player.avatar} 
+                                  alt={`${player.name}`}
+                                  className="w-6 h-6 rounded mr-2"
+                                />
+                              )}
+                              <span>{player.name}</span>
+                            </td>
+                            <td className="p-2">
+                              <span className={getRarityColorClass(player.cataLevel)}>
+                                {player.cataLevel}
+                              </span>
+                            </td>
+                            <td className="p-2">{player.classAvg}</td>
+                            <td className="p-2">{formatNumber(player.secretsFound)}</td>
+                            <td className="p-2">{formatNumber(player.completions)}</td>
+                            <td className="p-2">
+                              <div className="flex items-center">
+                                <div className={`w-2 h-2 rounded-full mr-2 ${getDungeonWeightColor(player.weight)}`}></div>
+                                {player.weight}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              {activeComparisonTab === "levels" && (
+                <div>
+                  <h3 className="text-xl font-bold mb-4">Class Levels Comparison</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-tertiary">
+                          <th className="p-2">Player</th>
+                          <th className="p-2">
+                            <Shield size={16} className="text-class-tank mr-1 inline" />
+                            Tank
+                          </th>
+                          <th className="p-2">
+                            <Heart size={16} className="text-class-healer mr-1 inline" />
+                            Healer
+                          </th>
+                          <th className="p-2">
+                            <Wand size={16} className="text-class-mage mr-1 inline" />
+                            Mage
+                          </th>
+                          <th className="p-2">
+                            <Sword size={16} className="text-class-berserk mr-1 inline" />
+                            Berserk
+                          </th>
+                          <th className="p-2">
+                            <Target size={16} className="text-class-archer mr-1 inline" />
+                            Archer
+                          </th>
+                          <th className="p-2">Average</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comparedPlayers.map((player) => {
+                          const classData = getClassData(player.profile);
+                          const classByName = classData.reduce((acc, cls) => {
+                            acc[cls.name] = cls.level;
+                            return acc;
+                          }, {});
+                          
+                          return (
+                            <tr key={player.name} className="border-t border-accent">
+                              <td className="p-2">{player.name}</td>
+                              <td className="p-2">
+                                <span className={getRarityColorClass(classByName.tank || 0)}>
+                                  {classByName.tank || 0}
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={getRarityColorClass(classByName.healer || 0)}>
+                                  {classByName.healer || 0}
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={getRarityColorClass(classByName.mage || 0)}>
+                                  {classByName.mage || 0}
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={getRarityColorClass(classByName.berserk || 0)}>
+                                  {classByName.berserk || 0}
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={getRarityColorClass(classByName.archer || 0)}>
+                                  {classByName.archer || 0}
+                                </span>
+                              </td>
+                              <td className="p-2 font-bold">{player.classAvg}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              {activeComparisonTab === "floors" && (
+                <div>
+                  <h3 className="text-xl font-bold mb-4">Floor Completions</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-tertiary">
+                          <th className="p-2">Player</th>
+                          <th className="p-2">F7 Comps</th>
+                          <th className="p-2">Best F7</th>
+                          <th className="p-2">M7 Comps</th>
+                          <th className="p-2">Best M7</th>
+                          <th className="p-2">Total Runs</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comparedPlayers.map((player) => {
+                          const dungeons = getDungeonsData(player.profile);
+                          const f7Completions = dungeons?.catacombs?.floors?.[7]?.stats?.tier_completions || 0;
+                          const m7Completions = dungeons?.master_catacombs?.floors?.[7]?.stats?.tier_completions || 0;
+                          
+                          return (
+                            <tr key={player.name} className="border-t border-accent">
+                              <td className="p-2">{player.name}</td>
+                              <td className="p-2">{formatNumber(f7Completions)}</td>
+                              <td className="p-2">{player.fastestF7}</td>
+                              <td className="p-2">{formatNumber(m7Completions)}</td>
+                              <td className="p-2">{player.fastestM7}</td>
+                              <td className="p-2">{formatNumber(player.completions)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  <h3 className="text-xl font-bold mt-6 mb-4">Floor Scores</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-tertiary">
+                          <th className="p-2">Player</th>
+                          <th className="p-2">F1 Score</th>
+                          <th className="p-2">F3 Score</th>
+                          <th className="p-2">F5 Score</th>
+                          <th className="p-2">F7 Score</th>
+                          <th className="p-2">M3 Score</th>
+                          <th className="p-2">M5 Score</th>
+                          <th className="p-2">M7 Score</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comparedPlayers.map((player) => {
+                          const dungeons = getDungeonsData(player.profile);
+                          
+                          const getScore = (mode, floor) => {
+                            const floorData = mode === "normal" 
+                              ? dungeons?.catacombs?.floors?.[floor]
+                              : dungeons?.master_catacombs?.floors?.[floor];
+                            
+                            return floorData?.stats?.best_score || 0;
+                          };
+                          
+                          return (
+                            <tr key={player.name} className="border-t border-accent">
+                              <td className="p-2">{player.name}</td>
+                              <td className="p-2">
+                                <span className={getScoreColorClass(getScore("normal", 1))}>
+                                  {getScore("normal", 1) || "N/A"}
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={getScoreColorClass(getScore("normal", 3))}>
+                                  {getScore("normal", 3) || "N/A"}
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={getScoreColorClass(getScore("normal", 5))}>
+                                  {getScore("normal", 5) || "N/A"}
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={getScoreColorClass(getScore("normal", 7))}>
+                                  {getScore("normal", 7) || "N/A"}
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={getScoreColorClass(getScore("master", 3))}>
+                                  {getScore("master", 3) || "N/A"}
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={getScoreColorClass(getScore("master", 5))}>
+                                  {getScore("master", 5) || "N/A"}
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={getScoreColorClass(getScore("master", 7))}>
+                                  {getScore("master", 7) || "N/A"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              {activeComparisonTab === "weight" && (
+                <div>
+                  <h3 className="text-xl font-bold mb-4">Weight Comparison</h3>
+                  
+                  <div className="mb-6">
+                    <h4 className="font-semibold mb-2">Weight Distribution</h4>
+                    <div className="flex items-center mb-2">
+                      <div className="w-full">
+                        {comparedPlayers.map((player) => (
+                          <div key={player.name} className="mb-2">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm">{player.name}</span>
+                              <span className="text-sm font-medium">{player.weight}</span>
+                            </div>
+                            <div className="w-full h-4 bg-tertiary rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${getDungeonWeightColor(player.weight)}`}
+                                style={{
+                                  width: `${Math.min(100, player.weight / 10)}%`,
+                                }}
+                              ></div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-tertiary p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3">Catacombs Level</h4>
+                      {comparedPlayers.map((player) => (
+                        <div key={player.name} className="flex items-center justify-between mb-2">
+                          <span>{player.name}</span>
+                          <span className={getRarityColorClass(player.cataLevel)}>
+                            {player.cataLevel}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="bg-tertiary p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3">Secrets Found</h4>
+                      {comparedPlayers.map((player) => (
+                        <div key={player.name} className="flex items-center justify-between mb-2">
+                          <span>{player.name}</span>
+                          <span>{formatNumber(player.secretsFound)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="bg-tertiary p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3">Class Average</h4>
+                      {comparedPlayers.map((player) => (
+                        <div key={player.name} className="flex items-center justify-between mb-2">
+                          <span>{player.name}</span>
+                          <span>{player.classAvg}</span>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="bg-tertiary p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3">Total Completions</h4>
+                      {comparedPlayers.map((player) => (
+                        <div key={player.name} className="flex items-center justify-between mb-2">
+                          <span>{player.name}</span>
+                          <span>{formatNumber(player.completions)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-primary text-text-primary p-4 md:p-6">
@@ -909,11 +1594,45 @@ const SkyblockDungeonTracker = () => {
                 </div>
               </div>
             )}
+            
+            {/* View mode toggle */}
+            {statsLoaded && (
+              <div className="mt-4 flex justify-center space-x-4">
+                <button
+                  onClick={() => setViewMode("single")}
+                  className={`px-4 py-2 rounded transition flex items-center ${
+                    viewMode === "single" 
+                      ? "bg-ui-primary text-text-primary" 
+                      : "bg-tertiary text-text-secondary hover:bg-opacity-80"
+                  }`}
+                >
+                  <User size={16} className="mr-2" />
+                  Single Player
+                </button>
+                <button
+                  onClick={() => {
+                    if (comparedPlayers.length === 0 && playerData) {
+                      // Add current player to comparison automatically
+                      addCurrentPlayerToComparison();
+                    }
+                    setViewMode("compare");
+                  }}
+                  className={`px-4 py-2 rounded transition flex items-center ${
+                    viewMode === "compare" 
+                      ? "bg-ui-primary text-text-primary" 
+                      : "bg-tertiary text-text-secondary hover:bg-opacity-80"
+                  }`}
+                >
+                  <Users size={16} className="mr-2" />
+                  Compare Players {comparedPlayers.length > 0 ? `(${comparedPlayers.length})` : ''}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* No data state */}
-        {!playerData && !loading && !error && (
+        {!playerData && !loading && !error && viewMode === "single" && comparedPlayers.length === 0 && (
           <div className="bg-secondary p-6 rounded-lg text-center shadow-card">
             <p className="text-text-secondary">
               Enter a player's IGN to view their dungeon stats.
@@ -937,7 +1656,7 @@ const SkyblockDungeonTracker = () => {
         )}
 
         {/* Player Data Display */}
-        {activeProfile && getDungeonsData() && (
+        {activeProfile && getDungeonsData() && viewMode === "single" && (
           <div id="results-section">
             {/* Player Header */}
             <div className="mb-8">
@@ -979,6 +1698,13 @@ const SkyblockDungeonTracker = () => {
                     >
                       <RefreshCw size={14} className="mr-1" />
                       <span>Refresh</span>
+                    </button>
+                    <button
+                      onClick={addCurrentPlayerToComparison}
+                      className="bg-ui-primary hover:bg-opacity-90 px-3 py-1 rounded-full text-sm flex items-center transition"
+                    >
+                      <Users size={14} className="mr-1" />
+                      <span>Add to Comparison</span>
                     </button>
                   </div>
                 </div>
@@ -1911,6 +2637,9 @@ const SkyblockDungeonTracker = () => {
             </div>
           </div>
         )}
+
+        {/* Comparison view */}
+        {viewMode === "compare" && <PlayerComparison />}
 
         {/* Footer */}
         <div className="text-center text-text-tertiary text-sm pt-4 pb-4">
