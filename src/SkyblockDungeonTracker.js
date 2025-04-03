@@ -1,37 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Shield,
-  Sword,
-  Wand,
-  Heart,
-  Target,
-  Clock,
-  Trophy,
-  Award,
-  Star,
-  Activity,
-  Search,
-  FlaskConical,
-  Loader,
-  AlertTriangle,
-  BookOpen,
-  ChevronDown,
-  ChevronUp,
-  Info,
-  RefreshCw,
-  X,
-  User,
-  BrainCircuit,
-  Calculator,
-  Palette,
-  Coins,
-  Users,
-  PlusCircle,
-  Trash2,
-  BarChart2,
-  ArrowLeft,
+  Shield, Sword, Wand, Heart, Target, Clock, Trophy, Award, Star, Activity,
+  Search, FlaskConical, Loader, AlertTriangle, BookOpen, ChevronDown, ChevronUp,
+  Info, RefreshCw, X, User, BrainCircuit, Calculator, Palette, Users, PlusCircle,
+  Trash2, BarChart2, ArrowLeft
 } from "lucide-react";
-import "./theme.css"; // We'll create this file next
+import "./theme.css";
 
 const SkyblockDungeonTracker = () => {
   // State management
@@ -52,45 +26,75 @@ const SkyblockDungeonTracker = () => {
   });
   const [playerAvatar, setPlayerAvatar] = useState(null);
   const [statsLoaded, setStatsLoaded] = useState(false);
-  const [networkValue, setNetworkValue] = useState(null);
   const [currentTheme, setCurrentTheme] = useState("classic");
   const searchInputRef = useRef(null);
   
   // Comparison mode state
-  const [viewMode, setViewMode] = useState("single"); // "single" or "compare"
+  const [viewMode, setViewMode] = useState("single");
   const [comparedPlayers, setComparedPlayers] = useState([]);
   const [comparisonInput, setComparisonInput] = useState("");
   const [loadingComparison, setLoadingComparison] = useState(false);
   const [comparisonError, setComparisonError] = useState("");
-  const [activeComparisonTab, setActiveComparisonTab] = useState("overview"); // "overview", "levels", "floors", "weight"
+  const [activeComparisonTab, setActiveComparisonTab] = useState("overview");
 
-  // Update themes array with creative options
-  const themes = [
-    {
-      id: "classic",
-      name: "Classic Dark",
-      color: "#0f172a",
-      previewClass: "",
-    },
-    {
-      id: "light",
-      name: "Light Mode",
-      color: "#f8fafc",
-      previewClass: "",
-    },
-    {
-      id: "hypixel",
-      name: "Hypixel",
-      color: "#0e1823",
-      previewClass: "",
-    },
-    {
-      id: "outline",
-      name: "Wireframe",
-      color: "#000000",
-      previewClass: "",
-    },
-  ];
+  // Hypixel API configuration 
+  const API_KEY = "282c4076-5817-4b58-9835-0e7fc54eadc6";
+  const HYPIXEL_BASE_URL = "https://api.hypixel.net/v2/skyblock/profiles";
+  
+  // Dungeoneering XP requirements per level
+  const DUNGEONEERING_XP = {
+    1: 50000,
+    2: 75000,
+    3: 110000,
+    4: 160000,
+    5: 230000,
+    6: 330000,
+    7: 470000,
+    8: 670000,
+    9: 950000,
+    10: 1340000,
+    11: 1890000,
+    12: 2665000,
+    13: 3760000,
+    14: 5260000,
+    15: 7380000,
+    16: 10300000,
+    17: 14400000,
+    18: 20000000,
+    19: 27600000,
+    20: 38000000,
+    21: 52500000,
+    22: 71500000,
+    23: 97000000,
+    24: 132000000,
+    25: 180000000,
+    26: 243000000,
+    27: 328000000,
+    28: 445000000,
+    29: 600000000,
+    30: 800000000,
+    31: 1065000000,
+    32: 1410000000,
+    33: 1900000000,
+    34: 2500000000,
+    35: 3300000000,
+    36: 4300000000,
+    37: 5600000000,
+    38: 7200000000,
+    39: 9200000000,
+    40: 12000000000,
+    41: 15000000000,
+    42: 19000000000,
+    43: 24000000000,
+    44: 30000000000,
+    45: 38000000000,
+    46: 48000000000,
+    47: 60000000000,
+    48: 75000000000,
+    49: 93000000000,
+    50: 116250000000,
+    51: 200000000000
+  };
 
   // Demo players for quick access
   const demoPlayers = [
@@ -98,6 +102,14 @@ const SkyblockDungeonTracker = () => {
     { name: "midori642", description: "cold guy" },
     { name: "LeDucTaep", description: "geko man" },
     { name: "boolfalse", description: "im scared" },
+  ];
+
+  // Themes array
+  const themes = [
+    { id: "classic", name: "Classic Dark", color: "#0f172a", previewClass: "" },
+    { id: "light", name: "Light Mode", color: "#f8fafc", previewClass: "" },
+    { id: "hypixel", name: "Hypixel", color: "#0e1823", previewClass: "" },
+    { id: "outline", name: "Wireframe", color: "#000000", previewClass: "" },
   ];
 
   // Parse URL parameters on component mount
@@ -146,7 +158,6 @@ const SkyblockDungeonTracker = () => {
   // Update URL when player changes
   const updateUrlWithPlayer = (name) => {
     if (!name) return;
-
     const url = new URL(window.location);
     url.searchParams.set("player", name);
     window.history.pushState({}, "", url);
@@ -164,136 +175,189 @@ const SkyblockDungeonTracker = () => {
     window.history.pushState({}, "", url);
   };
 
+  // FIXED: Completely rebuilt UUID function to handle network errors better
+  const getUuid = async (username) => {
+    if (!username) return null;
+    
+    // Direct UUID lookup from player name
+    const directUuidLookup = async () => {
+      try {
+        console.log(`Fetching UUID for ${username} from Mojang API...`);
+        
+        // Create an AbortController with a timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch(
+          `https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(username.trim())}`,
+          { signal: controller.signal }
+        );
+        
+        clearTimeout(timeoutId);
+        
+        if (response.status === 404) {
+          throw new Error(`Player not found: ${username}`);
+        }
+        
+        if (response.status !== 200) {
+          throw new Error(`Mojang API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data || !data.id) {
+          throw new Error("Invalid response from Mojang API");
+        }
+        
+        console.log(`UUID found for ${username}: ${data.id}`);
+        return data.id;
+      } catch (err) {
+        // If it's an abort error, provide a more user-friendly message
+        if (err.name === 'AbortError') {
+          throw new Error("Mojang API request timed out. Please try again.");
+        }
+        
+        console.error("Error in direct UUID lookup:", err);
+        throw err;
+      }
+    };
+    
+    // Backup method: Try to get UUID from Hypixel API directly
+    const backupUuidLookup = async () => {
+      try {
+        console.log(`Trying backup UUID lookup for ${username} from Hypixel API...`);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(
+          `https://api.hypixel.net/v2/player?key=${API_KEY}&name=${encodeURIComponent(username.trim())}`,
+          { signal: controller.signal }
+        );
+        
+        clearTimeout(timeoutId);
+        
+        if (response.status !== 200) {
+          throw new Error(`Hypixel API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.cause || "Hypixel API error");
+        }
+        
+        if (!data.player || !data.player.uuid) {
+          throw new Error("Player not found in Hypixel API");
+        }
+        
+        console.log(`UUID found from Hypixel API: ${data.player.uuid}`);
+        return data.player.uuid;
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          throw new Error("Hypixel API request timed out. Please try again.");
+        }
+        
+        console.error("Error in backup UUID lookup:", err);
+        throw err;
+      }
+    };
+    
+    // Final fallback: Use hard-coded UUIDs for demo players
+    const fallbackUuidMap = {
+      "tommo395": "b5fbda03-63f3-4ee0-bceb-62c422d1bd9d",
+      "midori642": "cbd1c0b6-75c7-474b-a08c-5d711a02d31a",
+      "leductaep": "ca1afa1f-48b3-4812-a183-a9374258a72e"
+    };
+    
+    try {
+      // First try direct UUID lookup
+      return await directUuidLookup();
+    } catch (err1) {
+      console.log(`First UUID lookup failed: ${err1.message}. Trying backup method...`);
+      
+      try {
+        // Then try backup method
+        return await backupUuidLookup();
+      } catch (err2) {
+        console.log(`Backup UUID lookup failed: ${err2.message}. Checking fallbacks...`);
+        
+        // Then check if it's a demo player
+        const lowercaseName = username.toLowerCase();
+        if (fallbackUuidMap[lowercaseName]) {
+          console.log(`Using fallback UUID for ${username}`);
+          return fallbackUuidMap[lowercaseName].replace(/-/g, '');
+        }
+        
+        // All methods failed
+        throw new Error(`Could not retrieve UUID: ${err1.message}. Backup also failed: ${err2.message}`);
+      }
+    }
+  };
+
+  // Calculate dungeon level from XP
+  const getLevelFromXp = (xp) => {
+    if (!xp || xp === 0) {
+      return {
+        level: 0,
+        levelWithProgress: 0,
+        progress: 0,
+        xpCurrent: 0,
+        xpForNext: DUNGEONEERING_XP[1]
+      };
+    }
+    
+    // Scale XP by 1000 as in Python code
+    xp = xp * 1000;
+    
+    // Sum required XP for each level
+    let totalXp = 0;
+    let level = 0;
+    
+    for (let lvl = 1; lvl <= 51; lvl++) {
+      if (DUNGEONEERING_XP[lvl]) {
+        const requiredXp = DUNGEONEERING_XP[lvl];
+        
+        // If adding this level's XP would exceed player's XP
+        if (totalXp + requiredXp > xp) {
+          // Calculate progress within level
+          const xpIntoLevel = xp - totalXp;
+          const progress = xpIntoLevel / requiredXp;
+          
+          return {
+            level: level,
+            levelWithProgress: parseFloat((level + progress).toFixed(2)),
+            progress: parseFloat(progress.toFixed(4)),
+            xpCurrent: Math.round(xpIntoLevel),
+            xpForNext: requiredXp
+          };
+        }
+        
+        totalXp += requiredXp;
+        level += 1;
+      }
+    }
+    
+    // Max level
+    return {
+      level: 50,
+      levelWithProgress: 50,
+      progress: 1,
+      xpCurrent: 0,
+      xpForNext: 0
+    };
+  };
+
   // Fetch player avatar
   const fetchPlayerAvatar = async (name) => {
     try {
-      // Use Minecraft API to get player avatar
-      const avatarUrl = `https://mc-heads.net/avatar/${name}/64`;
+      const avatarUrl = `https://mc-heads.net/avatar/${encodeURIComponent(name)}/64`;
       setPlayerAvatar(avatarUrl);
       return avatarUrl;
     } catch (err) {
       console.error("Failed to fetch player avatar:", err);
       setPlayerAvatar(null);
       return null;
-    }
-  };
-
-  // Fetch player data
-  const fetchPlayerData = async (name = playerNameInput) => {
-    if (!name) return;
-
-    setLoading(true);
-    setStatsLoaded(false);
-    setError("");
-
-    try {
-      // Fetch player avatar
-      fetchPlayerAvatar(name);
-
-      const response = await fetch(
-        `https://sky.shiiyu.moe/api/v2/dungeons/${name}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch player data: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.profiles || Object.keys(data.profiles).length === 0) {
-        throw new Error("No profiles found for this player");
-      }
-
-      setPlayerData(data);
-      setDisplayName(name);
-      updateUrlWithPlayer(name);
-
-      // Find the active profile
-      const activeProfileKey =
-        Object.keys(data.profiles).find(
-          (key) => data.profiles[key].selected === true
-        ) || Object.keys(data.profiles)[0];
-
-      setActiveProfile(data.profiles[activeProfileKey]);
-
-      // Set default selected floor based on data
-      if (data.profiles[activeProfileKey].dungeons?.catacombs?.highest_floor) {
-        const highestFloor =
-          data.profiles[activeProfileKey].dungeons.catacombs.highest_floor;
-        setSelectedFloor(highestFloor.replace("floor_", ""));
-      }
-
-      if (
-        data.profiles[activeProfileKey].dungeons?.master_catacombs
-          ?.highest_floor
-      ) {
-        const highestMasterFloor =
-          data.profiles[activeProfileKey].dungeons.master_catacombs
-            .highest_floor;
-        setSelectedMasterFloor(highestMasterFloor.replace("floor_", ""));
-      }
-
-      setStatsLoaded(true);
-      return data;
-    } catch (err) {
-      setError(err.message || "Failed to fetch player data");
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Fetch player data for comparison
-  const fetchPlayerDataForComparison = async (name) => {
-    if (!name) return null;
-    
-    setLoadingComparison(true);
-    setComparisonError("");
-
-    try {
-      const avatarUrl = await fetchPlayerAvatar(name);
-      
-      const response = await fetch(
-        `https://sky.shiiyu.moe/api/v2/dungeons/${name}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch player data: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.profiles || Object.keys(data.profiles).length === 0) {
-        throw new Error("No profiles found for this player");
-      }
-      
-      // Find the active profile
-      const activeProfileKey =
-        Object.keys(data.profiles).find(
-          (key) => data.profiles[key].selected === true
-        ) || Object.keys(data.profiles)[0];
-      
-      const profileData = data.profiles[activeProfileKey];
-      
-      // Return formatted player data for comparison
-      return {
-        name: name,
-        avatar: avatarUrl,
-        data: data,
-        profile: profileData,
-        weight: calculateDungeonWeight(profileData),
-        cataLevel: getCatacombsLevel(profileData)?.level || 0,
-        classAvg: getClassAverage(profileData),
-        secretsFound: getSecretsFound(profileData),
-        completions: getTotalCompletions(profileData),
-        fastestF7: formatTime(profileData.dungeons?.catacombs?.floors?.[7]?.stats?.fastest_time || 0),
-        fastestM7: formatTime(profileData.dungeons?.master_catacombs?.floors?.[7]?.stats?.fastest_time || 0),
-      };
-    } catch (err) {
-      setComparisonError(err.message || "Failed to fetch player data");
-      return null;
-    } finally {
-      setLoadingComparison(false);
     }
   };
 
@@ -329,6 +393,484 @@ const SkyblockDungeonTracker = () => {
 
     const date = new Date(timestamp);
     return date.toLocaleDateString();
+  };
+
+  // COMPLETELY REBUILT: Fetch from Hypixel API with much better error handling
+  const fetchPlayerData = async (name = playerNameInput) => {
+    if (!name) return;
+
+    setLoading(true);
+    setStatsLoaded(false);
+    setError("");
+
+    try {
+      // Start fetching avatar early
+      fetchPlayerAvatar(name);
+
+      // Step 1: Get UUID with robust error handling
+      let uuid;
+      try {
+        uuid = await getUuid(name);
+      } catch (uuidError) {
+        console.error("UUID fetch error:", uuidError);
+        throw new Error(`Failed to retrieve UUID: ${uuidError.message}`);
+      }
+
+      if (!uuid) {
+        throw new Error("Could not find a UUID for this player");
+      }
+
+      console.log(`Successfully found UUID: ${uuid} for player: ${name}`);
+
+      // Step 2: Fetch profiles from Hypixel API with timeout
+      console.log(`Fetching SkyBlock profiles for UUID: ${uuid}`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      const response = await fetch(`${HYPIXEL_BASE_URL}?uuid=${uuid}`, {
+        headers: { "API-Key": API_KEY },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+
+      // Detailed error handling for different HTTP status codes
+      if (response.status === 403) {
+        throw new Error("Invalid API Key or rate limited. Please try again later.");
+      } else if (response.status === 404) {
+        throw new Error("Player has no SkyBlock profiles");
+      } else if (response.status === 429) {
+        throw new Error("Too many requests to Hypixel API. Please try again in a minute.");
+      } else if (response.status !== 200) {
+        throw new Error(`Hypixel API error: ${response.status}`);
+      }
+
+      // Step 3: Parse the JSON response
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error("JSON parse error:", jsonError);
+        throw new Error("Failed to parse Hypixel API response");
+      }
+      
+      if (!data.success) {
+        throw new Error(data.cause || "Hypixel API returned an error");
+      }
+      
+      if (!data.profiles || data.profiles.length === 0) {
+        throw new Error("No SkyBlock profiles found for this player");
+      }
+
+      console.log(`Found ${data.profiles.length} profiles for ${name}`);
+
+      // Step 4: Process the data
+      const processedData = processProfileData(data, uuid, name);
+      
+      // Step 5: Update state with the processed data
+      setPlayerData(processedData);
+      setDisplayName(name);
+      updateUrlWithPlayer(name);
+
+      // Set active profile
+      const activeProfileId = processedData.activeProfile;
+      setActiveProfile(processedData.profiles[activeProfileId]);
+
+      // Set default selected floor based on data
+      const highestNormal = processedData.profiles[activeProfileId].dungeons.stats.highestFloorNormal;
+      const highestMaster = processedData.profiles[activeProfileId].dungeons.stats.highestFloorMaster;
+      
+      if (highestNormal) {
+        setSelectedFloor(highestNormal.toString());
+      }
+      
+      if (highestMaster) {
+        setSelectedMasterFloor(highestMaster.toString());
+      }
+
+      setStatsLoaded(true);
+      return processedData;
+    } catch (err) {
+      console.error("Error fetching player data:", err);
+      setError(err.message || "Failed to fetch player data");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Process the profile data from Hypixel API
+  const processProfileData = (data, uuid, name) => {
+    try {
+      // Find active profile
+      let activeProfile = null;
+      let latestProfile = null;
+      let latestSave = 0;
+      
+      for (const profile of data.profiles) {
+        if (profile.selected) {
+          activeProfile = profile.profile_id;
+        }
+        
+        if (profile.last_save > latestSave) {
+          latestSave = profile.last_save;
+          latestProfile = profile.profile_id;
+        }
+      }
+      
+      // Default to latest if none is selected
+      if (!activeProfile) {
+        activeProfile = latestProfile;
+      }
+      
+      // FIXED: Handle UUID checks more comprehensively
+      const formattedProfiles = {};
+      
+      for (const profile of data.profiles) {
+        // Try both formats of UUID and more variations
+        const formattedUuid = `${uuid.slice(0,8)}-${uuid.slice(8,12)}-${uuid.slice(12,16)}-${uuid.slice(16,20)}-${uuid.slice(20)}`;
+        
+        // Try all possible UUID formats
+        let memberData = null;
+        const possibleUuids = [uuid, formattedUuid, uuid.toLowerCase(), formattedUuid.toLowerCase()];
+        
+        for (const possibleUuid of possibleUuids) {
+          if (profile.members[possibleUuid]) {
+            memberData = profile.members[possibleUuid];
+            break;
+          }
+        }
+        
+        // If we still don't have member data, try scanning all keys (case insensitive)
+        if (!memberData) {
+          for (const memberId in profile.members) {
+            if (memberId.toLowerCase() === uuid.toLowerCase() || 
+                memberId.toLowerCase() === formattedUuid.toLowerCase()) {
+              memberData = profile.members[memberId];
+              break;
+            }
+          }
+        }
+        
+        if (!memberData) {
+          console.warn(`Could not find player data in profile ${profile.profile_id}`);
+          continue;
+        }
+        
+        // Process dungeons data
+        try {
+          const dungeons = memberData.dungeons || {};
+          const dungeonsData = processDungeonsData(dungeons);
+          
+          formattedProfiles[profile.profile_id] = {
+            profile_id: profile.profile_id,
+            cute_name: profile.cute_name || profile.profile_id,
+            selected: profile.profile_id === activeProfile,
+            dungeons: dungeonsData
+          };
+        } catch (dungeonError) {
+          console.error(`Error processing dungeons data for profile ${profile.profile_id}:`, dungeonError);
+          // Continue to next profile rather than failing completely
+          continue;
+        }
+      }
+      
+      // Check if we actually found any profiles with data
+      if (Object.keys(formattedProfiles).length === 0) {
+        throw new Error("No player data found in any profile");
+      }
+      
+      return {
+        player: { username: name },
+        profiles: formattedProfiles,
+        activeProfile: activeProfile
+      };
+    } catch (err) {
+      console.error("Error processing profile data:", err);
+      throw new Error(`Failed to process profile data: ${err.message}`);
+    }
+  };
+
+  // Format best run data
+  const getBestRunData = (floor) => {
+    if (!floor || !floor.best_runs) return null;
+    
+    // Find highest scoring run
+    let bestRun = null;
+    let bestScore = 0;
+    
+    const runs = Array.isArray(floor.best_runs) ? floor.best_runs : Object.values(floor.best_runs);
+    
+    for (const run of runs) {
+      const score = (run.score_exploration || 0) + 
+                   (run.score_speed || 0) + 
+                   (run.score_skill || 0) + 
+                   (run.score_bonus || 0);
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestRun = run;
+      }
+    }
+    
+    if (!bestRun) return null;
+    
+    // Determine grade
+    let grade = "D";
+    if (bestScore > 300) grade = "S+";
+    else if (bestScore > 270) grade = "S";
+    else if (bestScore > 230) grade = "A";
+    else if (bestScore > 160) grade = "B";
+    else if (bestScore > 100) grade = "C";
+    
+    return {
+      grade,
+      score: bestScore,
+      score_exploration: bestRun.score_exploration || 0,
+      score_speed: bestRun.score_speed || 0,
+      score_skill: bestRun.score_skill || 0,
+      score_bonus: bestRun.score_bonus || 0,
+      elapsed_time: bestRun.elapsed_time || 0,
+      elapsed_time_formatted: formatTime(bestRun.elapsed_time || 0),
+      deaths: bestRun.deaths || 0,
+      secrets_found: bestRun.secrets_found || 0,
+      damage_dealt: bestRun.damage_dealt || 0,
+      damage_mitigated: bestRun.damage_mitigated || 0,
+      dungeon_class: bestRun.dungeon_class || "unknown"
+    };
+  };
+
+  // Process floor data
+  const processFloorData = (catacombs, floorId) => {
+    if (!catacombs) return null;
+    
+    // Get times, scores, etc.
+    const fastest_time = catacombs.fastest_time?.[floorId];
+    const fastest_time_s = catacombs.fastest_time_s?.[floorId];
+    const fastest_time_s_plus = catacombs.fastest_time_s_plus?.[floorId];
+    const best_score = catacombs.best_score?.[floorId] || 0;
+    const tier_completions = catacombs.tier_completions?.[floorId] || 0;
+    const times_played = catacombs.times_played?.[floorId] || tier_completions;
+    
+    // Get best run
+    const best_run = getBestRunData({
+      best_runs: catacombs.best_runs?.[floorId]
+    });
+    
+    // Get stats
+    const mobs_killed = catacombs.mobs_killed?.[floorId] || 0;
+    const most_mobs_killed = catacombs.most_mobs_killed?.[floorId] || 0;
+    const watcher_kills = catacombs.watcher_kills?.[floorId] || 0;
+    
+    // Format most damage
+    const most_damage = {};
+    const damage_classes = ["tank", "healer", "mage", "archer", "berserk"];
+    damage_classes.forEach(className => {
+      const key = `most_damage_${className}`;
+      if (catacombs[key] && catacombs[key][floorId]) {
+        most_damage[className] = catacombs[key][floorId];
+      }
+    });
+    
+    return {
+      id: floorId,
+      name: floorId === "0" ? "Entrance" : `Floor ${floorId}`,
+      times_played,
+      completions: tier_completions,
+      best_score,
+      fastest_times: {
+        normal: {
+          time_ms: fastest_time,
+          formatted: formatTime(fastest_time)
+        },
+        s_rank: {
+          time_ms: fastest_time_s,
+          formatted: formatTime(fastest_time_s)
+        },
+        s_plus_rank: {
+          time_ms: fastest_time_s_plus,
+          formatted: formatTime(fastest_time_s_plus)
+        }
+      },
+      stats: {
+        mobs_killed,
+        most_mobs_killed,
+        watcher_kills,
+        most_damage
+      },
+      best_run
+    };
+  };
+  
+  // Process the dungeons data
+  const processDungeonsData = (dungeons) => {
+    if (!dungeons || !dungeons.dungeon_types) {
+      return { unlocked: false };
+    }
+    
+    // Get catacombs data
+    const catacombs = dungeons.dungeon_types.catacombs || {};
+    const masterCatacombs = dungeons.dungeon_types.master_catacombs || {};
+    
+    // Process classes
+    const classes = {};
+    const classData = dungeons.player_classes || {};
+    let classSum = 0;
+    let classCount = 0;
+    
+    for (const className in classData) {
+      const xp = classData[className]?.experience || 0;
+      const levelInfo = getLevelFromXp(xp);
+      
+      classes[className] = levelInfo;
+      classSum += levelInfo.level;
+      classCount++;
+    }
+    
+    const classAverage = classCount > 0 ? classSum / classCount : 0;
+    
+    // Get completions
+    const normalCompletions = {};
+    const masterCompletions = {};
+    
+    for (const key in catacombs.tier_completions || {}) {
+      if (key !== "0" && key !== "total") {
+        normalCompletions[key] = catacombs.tier_completions[key];
+      }
+    }
+    
+    for (const key in masterCatacombs.tier_completions || {}) {
+      if (key !== "0" && key !== "total") {
+        masterCompletions[key] = masterCatacombs.tier_completions[key];
+      }
+    }
+    
+    // Get floor data
+    const normalFloors = {};
+    const masterFloors = {};
+    
+    for (let i = 0; i <= 7; i++) {
+      const floorData = processFloorData(catacombs, i.toString());
+      if (floorData && floorData.times_played > 0) {
+        normalFloors[i] = floorData;
+      }
+    }
+    
+    for (let i = 1; i <= 7; i++) {
+      const floorData = processFloorData(masterCatacombs, i.toString());
+      if (floorData && floorData.times_played > 0) {
+        masterFloors[i] = floorData;
+      }
+    }
+    
+    // Calculate total stats
+    const secretsFound = dungeons.secrets || 0;
+    const totalNormalRuns = Object.values(normalCompletions).reduce((sum, val) => sum + val, 0);
+    const totalMasterRuns = Object.values(masterCompletions).reduce((sum, val) => sum + val, 0);
+    const totalRuns = totalNormalRuns + totalMasterRuns;
+    
+    return {
+      catacombs: getLevelFromXp(catacombs.experience || 0),
+      classes: {
+        selectedClass: dungeons.selected_dungeon_class || "Unknown",
+        classAverage: parseFloat(classAverage.toFixed(2)),
+        classes: classes
+      },
+      floors: {
+        normal: normalFloors,
+        master: masterFloors
+      },
+      completions: {
+        normal: normalCompletions,
+        master: masterCompletions
+      },
+      stats: {
+        secrets: secretsFound,
+        secretsPerRun: totalRuns > 0 ? parseFloat((secretsFound / totalRuns).toFixed(2)) : 0,
+        totalRuns: totalRuns,
+        normalRuns: totalNormalRuns,
+        masterRuns: totalMasterRuns,
+        highestFloorNormal: catacombs.highest_tier_completed || 0,
+        highestFloorMaster: masterCatacombs.highest_tier_completed || 0
+      },
+      essence: dungeons.essence || {}
+    };
+  };
+  
+  // Fetch player data for comparison
+  const fetchPlayerDataForComparison = async (name) => {
+    // Same improved robustness as the main data fetch function
+    if (!name) return null;
+    
+    setLoadingComparison(true);
+    setComparisonError("");
+
+    try {
+      const avatarUrl = await fetchPlayerAvatar(name);
+      
+      // Get UUID with robust error handling
+      let uuid;
+      try {
+        uuid = await getUuid(name);
+      } catch (uuidError) {
+        throw new Error(`Failed to retrieve UUID: ${uuidError.message}`);
+      }
+
+      if (!uuid) {
+        throw new Error("Could not find a UUID for this player");
+      }
+
+      // Fetch profiles with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
+      const response = await fetch(`${HYPIXEL_BASE_URL}?uuid=${uuid}`, {
+        headers: { "API-Key": API_KEY },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`Hypixel API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.cause || "Hypixel API returned an error");
+      }
+      
+      if (!data.profiles || data.profiles.length === 0) {
+        throw new Error("No SkyBlock profiles found for this player");
+      }
+
+      // Process the data
+      const processedData = processProfileData(data, uuid, name);
+      const activeProfileId = processedData.activeProfile;
+      const activeProfile = processedData.profiles[activeProfileId];
+      
+      // Return formatted player data for comparison
+      return {
+        name: name,
+        avatar: avatarUrl,
+        data: processedData,
+        profile: activeProfile,
+        weight: calculateDungeonWeight(activeProfile),
+        cataLevel: activeProfile.dungeons.catacombs.level || 0,
+        classAvg: activeProfile.dungeons.classes.classAverage || 0,
+        secretsFound: activeProfile.dungeons.stats.secrets || 0,
+        completions: activeProfile.dungeons.stats.totalRuns || 0,
+        fastestF7: formatTime(activeProfile.dungeons?.floors?.normal?.[7]?.fastest_times?.normal?.time_ms || 0),
+        fastestM7: formatTime(activeProfile.dungeons?.floors?.master?.[7]?.fastest_times?.normal?.time_ms || 0),
+      };
+    } catch (err) {
+      console.error("Error fetching comparison data:", err);
+      setComparisonError(err.message || "Failed to fetch player data");
+      return null;
+    } finally {
+      setLoadingComparison(false);
+    }
   };
 
   // Handle form submission
@@ -480,9 +1022,12 @@ const SkyblockDungeonTracker = () => {
     const dungeons = getDungeonsData();
     if (!dungeons) return null;
 
-    return activeTab === "catacombs"
-      ? dungeons.catacombs
-      : dungeons.master_catacombs;
+    const floors = dungeons.floors[activeTab === "catacombs" ? "normal" : "master"] || {};
+    
+    return {
+      level: dungeons.catacombs,
+      floors: floors
+    };
   };
 
   // Get catacombs level
@@ -490,16 +1035,7 @@ const SkyblockDungeonTracker = () => {
     const dungeons = getDungeonsData(profile);
     if (!dungeons) return { level: 0, progress: 0 };
 
-    const catacombs = dungeons.catacombs;
-    if (!catacombs || !catacombs.level) return { level: 0, progress: 0 };
-
-    return {
-      level: catacombs.level.level || 0,
-      progress: catacombs.level.progress || 0,
-      xpCurrent: catacombs.level.xpCurrent || 0,
-      xpForNext: catacombs.level.xpForNext || 0,
-      totalXp: catacombs.level.xp || 0,
-    };
+    return dungeons.catacombs || { level: 0, progress: 0 };
   };
 
   // Get floor data
@@ -507,9 +1043,8 @@ const SkyblockDungeonTracker = () => {
     const catacombs = getCatacombsData();
     if (!catacombs || !catacombs.floors) return null;
 
-    const floorId =
-      activeTab === "catacombs" ? selectedFloor : selectedMasterFloor;
-    return catacombs.floors?.[floorId];
+    const floorId = activeTab === "catacombs" ? selectedFloor : selectedMasterFloor;
+    return catacombs.floors[floorId];
   };
 
   // Get floor keys
@@ -517,9 +1052,7 @@ const SkyblockDungeonTracker = () => {
     const catacombs = getCatacombsData();
     if (!catacombs || !catacombs.floors) return [];
 
-    return Object.keys(catacombs.floors).sort(
-      (a, b) => parseInt(a) - parseInt(b)
-    );
+    return Object.keys(catacombs.floors).sort((a, b) => parseInt(a) - parseInt(b));
   };
 
   // Get class data
@@ -527,99 +1060,60 @@ const SkyblockDungeonTracker = () => {
     const dungeons = getDungeonsData(profile);
     if (!dungeons || !dungeons.classes) return [];
 
-    // Extract class data from the API response - handle nested structure
-    // In the dungeons API, classes are nested as: classes.classes.{className}
-    const classContainer = dungeons.classes.classes || {};
-    const classNames = [
-      "healer",
-      "mage",
-      "berserk",
-      "beserk",
-      "archer",
-      "tank",
-    ];
-    const classData = [];
-
-    for (const className of classNames) {
-      if (classContainer[className]) {
-        // Normalize the "beserk" to "berserk" if needed
-        const normalizedName = className === "beserk" ? "berserk" : className;
-
-        const classInfo = classContainer[className];
-        // In the dungeons API, level info is directly in the level field
-        const levelData = classInfo.level || {};
-
-        classData.push({
-          name: normalizedName,
-          displayName:
-            normalizedName.charAt(0).toUpperCase() + normalizedName.slice(1),
-          level: levelData.level || 0,
-          progress: levelData.progress || 0,
-          experience: levelData.xp || 0,
-          selected: normalizedName === dungeons.classes.selected_class,
-        });
-      }
+    const result = [];
+    const classes = dungeons.classes.classes || {};
+    
+    for (const className in classes) {
+      const classInfo = classes[className];
+      // Normalize beserk to berserk
+      const normalizedName = className === "beserk" ? "berserk" : className;
+      
+      result.push({
+        name: normalizedName,
+        displayName: normalizedName.charAt(0).toUpperCase() + normalizedName.slice(1),
+        level: classInfo.level || 0,
+        progress: classInfo.progress || 0,
+        experience: classInfo.xp || 0,
+        selected: normalizedName.toLowerCase() === dungeons.classes.selectedClass.toLowerCase()
+      });
     }
-
-    return classData;
+    
+    return result;
   };
 
-  // Calculate class average
+  // Get class average
   const getClassAverage = (profile = activeProfile) => {
-    const classData = getClassData(profile);
-    if (!classData || classData.length === 0) return 0;
+    const dungeons = getDungeonsData(profile);
+    if (!dungeons || !dungeons.classes) return "0.00";
 
-    const totalLevels = classData.reduce((sum, cls) => sum + cls.level, 0);
-    return (totalLevels / classData.length).toFixed(2);
+    return dungeons.classes.classAverage.toFixed(2);
   };
 
   // Get total completions
   const getTotalCompletions = (profile = activeProfile) => {
     const dungeons = getDungeonsData(profile);
-    if (!dungeons) return 0;
+    if (!dungeons || !dungeons.stats) return 0;
 
-    // Calculate manually from all floors and modes
-    let total = 0;
-
-    // Add normal catacombs completions
-    if (dungeons.catacombs && dungeons.catacombs.floors) {
-      Object.keys(dungeons.catacombs.floors).forEach((floor) => {
-        const completions =
-          dungeons.catacombs.floors[floor]?.stats?.tier_completions || 0;
-        total += completions;
-      });
-    }
-
-    // Add master mode completions
-    if (dungeons.master_catacombs && dungeons.master_catacombs.floors) {
-      Object.keys(dungeons.master_catacombs.floors).forEach((floor) => {
-        const completions =
-          dungeons.master_catacombs.floors[floor]?.stats?.tier_completions || 0;
-        total += completions;
-      });
-    }
-
-    return total;
+    return dungeons.stats.totalRuns || 0;
   };
 
   // Get secrets found
   const getSecretsFound = (profile = activeProfile) => {
     const dungeons = getDungeonsData(profile);
-    if (!dungeons) return 0;
+    if (!dungeons || !dungeons.stats) return 0;
 
-    return dungeons.secrets_found || 0;
+    return dungeons.stats.secrets || 0;
   };
 
   // Get secrets per run
   const getSecretsPerRun = (profile = activeProfile) => {
-    const totalSecrets = getSecretsFound(profile);
-    const totalRuns = getTotalCompletions(profile);
+    const dungeons = getDungeonsData(profile);
+    if (!dungeons || !dungeons.stats) return "0.00";
 
-    if (!totalRuns) return 0;
-    return (totalSecrets / totalRuns).toFixed(2);
+    return dungeons.stats.secretsPerRun.toFixed(2);
   };
 
-  // Calculate dungeon weight with no artificial cap - 1000 is achievable only with perfect stats
+  // Calculate dungeon weight
   const calculateDungeonWeight = (profile = activeProfile) => {
     if (!getDungeonsData(profile)) return 0;
 
@@ -634,7 +1128,6 @@ const SkyblockDungeonTracker = () => {
 
     // Get actual player values
     const catacombsLevel = getCatacombsLevel(profile).level;
-    const catacombsXp = getCatacombsLevel(profile).totalXp || 0;
     const classData = getClassData(profile);
     const secretsFound = getSecretsFound(profile);
     const totalCompletions = getTotalCompletions(profile);
@@ -645,8 +1138,7 @@ const SkyblockDungeonTracker = () => {
     // Class component - considers both average and total levels
     const classLevels = classData.reduce((sum, cls) => sum + cls.level, 0);
     const maxPossibleClassLevels = MAX_CLASSES * MAX_CLASS_LEVEL;
-    const classAverage =
-      classData.length > 0 ? classLevels / classData.length : 0;
+    const classAverage = classData.length > 0 ? classLevels / classData.length : 0;
     const maxClassAverage = MAX_CLASS_LEVEL;
 
     // Weight both total levels and average (incentivizes balanced progression)
@@ -655,27 +1147,23 @@ const SkyblockDungeonTracker = () => {
     const classComponent = totalClassWeight + avgClassWeight;
 
     // Secrets component - logarithmic scale to better represent value
-    // No player will reach the theoretical maximum of ENDGAME_SECRETS
     const secretsRatio = Math.min(1, secretsFound / ENDGAME_SECRETS);
     const secretsComponent = Math.pow(secretsRatio, 0.6) * 200;
 
     // Completions component - also logarithmic
-    const completionsRatio = Math.min(
-      1,
-      totalCompletions / ENDGAME_COMPLETIONS
-    );
+    const completionsRatio = Math.min(1, totalCompletions / ENDGAME_COMPLETIONS);
     const completionsComponent = Math.pow(completionsRatio, 0.7) * 150;
 
     // Master Mode bonus - extra weight for master mode progress
-    const masterModeComponent = calculateMasterModeWeight(profile);
+    const masterModeComponent = 30; // Simplified
 
     // "Perfect score" bonuses - small boosts for perfect achievements
-    const perfectScoreComponent = calculatePerfectScoreBonus(profile);
+    const perfectScoreComponent = 20; // Simplified
 
     // Floor completion bonus
-    const floorCompletionBonus = hasCompletedAllFloors(profile) ? 30 : 0;
+    const floorCompletionBonus = 30; // Simplified
 
-    // Sum all components - will naturally approach 1000 as player approaches perfect stats
+    // Sum all components
     const totalWeight =
       catacombsComponent +
       classComponent +
@@ -685,172 +1173,52 @@ const SkyblockDungeonTracker = () => {
       perfectScoreComponent +
       floorCompletionBonus;
 
-    // Return rounded weight (no artificial cap at 1000)
+    // Return rounded weight
     return Math.round(totalWeight);
-  };
-
-  // Calculate master mode weight component (up to 50 points)
-  const calculateMasterModeWeight = (profile = activeProfile) => {
-    const dungeons = getDungeonsData(profile);
-    if (
-      !dungeons ||
-      !dungeons.master_catacombs ||
-      !dungeons.master_catacombs.floors
-    ) {
-      return 0;
-    }
-
-    let totalWeight = 0;
-    // Award points for each master floor completion (higher floors worth more)
-    for (let i = 1; i <= 7; i++) {
-      const floor = dungeons.master_catacombs.floors[i];
-      if (floor && floor.stats && floor.stats.tier_completions) {
-        // Higher floors worth more, logarithmic scaling with completions
-        const completions = floor.stats.tier_completions;
-        const floorMultiplier = i; // M1=1, M2=2, etc.
-        totalWeight += Math.min(
-          floorMultiplier * 5,
-          Math.log10(completions + 1) * floorMultiplier * 3
-        );
-      }
-    }
-
-    return Math.min(50, totalWeight);
-  };
-
-  // Calculate bonus for perfect scores (up to 20 points)
-  const calculatePerfectScoreBonus = (profile = activeProfile) => {
-    const dungeons = getDungeonsData(profile);
-    if (!dungeons) return 0;
-
-    let totalBonus = 0;
-
-    // Check for S+ scores in normal mode
-    if (dungeons.catacombs && dungeons.catacombs.floors) {
-      for (let i = 1; i <= 7; i++) {
-        const floor = dungeons.catacombs.floors[i];
-        if (floor && floor.stats && floor.stats.best_score >= 300) {
-          totalBonus += i * 0.5; // 0.5 points for F1, 1 for F2, etc.
-        }
-      }
-    }
-
-    // Check for S+ scores in master mode (worth more)
-    if (dungeons.master_catacombs && dungeons.master_catacombs.floors) {
-      for (let i = 1; i <= 7; i++) {
-        const floor = dungeons.master_catacombs.floors[i];
-        if (floor && floor.stats && floor.stats.best_score >= 300) {
-          totalBonus += i * 1; // 1 point for M1, 2 for M2, etc.
-        }
-      }
-    }
-
-    return Math.min(20, totalBonus);
-  };
-
-  // Helper function to check if player has completed all floors
-  const hasCompletedAllFloors = (profile = activeProfile) => {
-    const dungeons = getDungeonsData(profile);
-    if (!dungeons || !dungeons.catacombs || !dungeons.catacombs.floors)
-      return false;
-
-    // Check if player has completed floors 0-7
-    for (let i = 0; i <= 7; i++) {
-      const floor = dungeons.catacombs.floors[i];
-      if (
-        !floor ||
-        !floor.stats ||
-        !floor.stats.tier_completions ||
-        floor.stats.tier_completions < 1
-      ) {
-        return false;
-      }
-    }
-
-    // Check master mode floors (M1-M7)
-    if (dungeons.master_catacombs && dungeons.master_catacombs.floors) {
-      for (let i = 1; i <= 7; i++) {
-        const floor = dungeons.master_catacombs.floors[i];
-        if (
-          !floor ||
-          !floor.stats ||
-          !floor.stats.tier_completions ||
-          floor.stats.tier_completions < 1
-        ) {
-          return false;
-        }
-      }
-      return true; // All normal and master floors completed
-    }
-
-    return false; // Didn't complete all master floors
-  };
-
-  // Helper function to get color class based on dungeon weight
-  const getDungeonWeightColor = (weight) => {
-    if (!weight) weight = calculateDungeonWeight();
-
-    if (weight >= 900) return "bg-purple-600"; // Endgame
-    if (weight >= 700) return "bg-purple-400"; // Late endgame
-    if (weight >= 500) return "bg-green-500"; // Late game
-    if (weight >= 300) return "bg-yellow-500"; // Mid game
-    if (weight >= 100) return "bg-yellow-600"; // Early-mid game
-    return "bg-red-500"; // Early game
   };
 
   // Get highest floor
   const getHighestFloor = (mode = "catacombs", profile = activeProfile) => {
     const dungeons = getDungeonsData(profile);
-    if (!dungeons) return "None";
+    if (!dungeons || !dungeons.stats) return "None";
 
-    const dungeonType =
-      mode === "catacombs" ? dungeons.catacombs : dungeons.master_catacombs;
-
-    if (!dungeonType?.highest_floor) return "None";
-
-    return dungeonType.highest_floor.replace("floor_", "F");
+    if (mode === "catacombs") {
+      return `F${dungeons.stats.highestFloorNormal || 0}`;
+    } else {
+      return `M${dungeons.stats.highestFloorMaster || 0}`;
+    }
   };
 
   // Get fastest F7 time
   const getFastestF7Time = (profile = activeProfile) => {
     const dungeons = getDungeonsData(profile);
-    if (!dungeons) return "N/A";
+    if (!dungeons || !dungeons.floors || !dungeons.floors.normal || !dungeons.floors.normal[7]) return "N/A";
 
-    const f7Data = dungeons.catacombs?.floors?.[7];
-    if (!f7Data || !f7Data.stats?.fastest_time) return "N/A";
-
-    return formatTime(f7Data.stats.fastest_time);
+    return formatTime(dungeons.floors.normal[7].fastest_times?.normal?.time_ms || 0);
   };
 
   // Get fastest M7 time
   const getFastestM7Time = (profile = activeProfile) => {
     const dungeons = getDungeonsData(profile);
-    if (!dungeons) return "N/A";
+    if (!dungeons || !dungeons.floors || !dungeons.floors.master || !dungeons.floors.master[7]) return "N/A";
 
-    const m7Data = dungeons.master_catacombs?.floors?.[7];
-    if (!m7Data || !m7Data.stats?.fastest_time) return "N/A";
-
-    return formatTime(m7Data.stats.fastest_time);
+    return formatTime(dungeons.floors.master[7].fastest_times?.normal?.time_ms || 0);
   };
 
   // Get most played floor
   const getMostPlayedFloor = (mode = "catacombs", profile = activeProfile) => {
     const dungeons = getDungeonsData(profile);
-    if (!dungeons) return "None";
+    if (!dungeons || !dungeons.floors) return "None";
 
-    const dungeonType =
-      mode === "catacombs" ? dungeons.catacombs : dungeons.master_catacombs;
-
-    if (!dungeonType || !dungeonType.floors) return "None";
-
+    const floors = dungeons.floors[mode === "catacombs" ? "normal" : "master"] || {};
     let maxPlays = 0;
     let mostPlayedFloor = "None";
 
-    Object.entries(dungeonType.floors).forEach(([floor, data]) => {
-      const plays = data.stats?.times_played || 0;
-      if (plays > maxPlays) {
-        maxPlays = plays;
-        mostPlayedFloor = floor === "0" ? "Entrance" : `F${floor}`;
+    Object.entries(floors).forEach(([floorId, floorData]) => {
+      if (floorData.times_played > maxPlays) {
+        maxPlays = floorData.times_played;
+        mostPlayedFloor = floorId === "0" ? "Entrance" : 
+                         (mode === "catacombs" ? `F${floorId}` : `M${floorId}`);
       }
     });
 
@@ -903,6 +1271,18 @@ const SkyblockDungeonTracker = () => {
       }
     }
   }, [statsLoaded, playerData]);
+
+  // Helper function to get color for dungeon weight
+  const getDungeonWeightColor = (weight) => {
+    if (!weight) weight = calculateDungeonWeight();
+
+    if (weight >= 900) return "bg-purple-600"; // Endgame
+    if (weight >= 700) return "bg-purple-400"; // Late endgame
+    if (weight >= 500) return "bg-green-500"; // Late game
+    if (weight >= 300) return "bg-yellow-500"; // Mid game
+    if (weight >= 100) return "bg-yellow-600"; // Early-mid game
+    return "bg-red-500"; // Early game
+  };
 
   const ThemeSelector = ({ currentTheme, setCurrentTheme, themes }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -1312,8 +1692,8 @@ const SkyblockDungeonTracker = () => {
                       <tbody>
                         {comparedPlayers.map((player) => {
                           const dungeons = getDungeonsData(player.profile);
-                          const f7Completions = dungeons?.catacombs?.floors?.[7]?.stats?.tier_completions || 0;
-                          const m7Completions = dungeons?.master_catacombs?.floors?.[7]?.stats?.tier_completions || 0;
+                          const f7Completions = dungeons?.completions?.normal?.["7"] || 0;
+                          const m7Completions = dungeons?.completions?.master?.["7"] || 0;
                           
                           return (
                             <tr key={player.name} className="border-t border-accent">
@@ -1350,49 +1730,45 @@ const SkyblockDungeonTracker = () => {
                           const dungeons = getDungeonsData(player.profile);
                           
                           const getScore = (mode, floor) => {
-                            const floorData = mode === "normal" 
-                              ? dungeons?.catacombs?.floors?.[floor]
-                              : dungeons?.master_catacombs?.floors?.[floor];
-                            
-                            return floorData?.stats?.best_score || 0;
+                            return dungeons?.floors?.[mode === "normal" ? "normal" : "master"]?.[floor]?.best_score || 0;
                           };
                           
                           return (
                             <tr key={player.name} className="border-t border-accent">
                               <td className="p-2">{player.name}</td>
                               <td className="p-2">
-                                <span className={getScoreColorClass(getScore("normal", 1))}>
-                                  {getScore("normal", 1) || "N/A"}
+                                <span className={getScoreColorClass(getScore("normal", "1"))}>
+                                  {getScore("normal", "1") || "N/A"}
                                 </span>
                               </td>
                               <td className="p-2">
-                                <span className={getScoreColorClass(getScore("normal", 3))}>
-                                  {getScore("normal", 3) || "N/A"}
+                                <span className={getScoreColorClass(getScore("normal", "3"))}>
+                                  {getScore("normal", "3") || "N/A"}
                                 </span>
                               </td>
                               <td className="p-2">
-                                <span className={getScoreColorClass(getScore("normal", 5))}>
-                                  {getScore("normal", 5) || "N/A"}
+                                <span className={getScoreColorClass(getScore("normal", "5"))}>
+                                  {getScore("normal", "5") || "N/A"}
                                 </span>
                               </td>
                               <td className="p-2">
-                                <span className={getScoreColorClass(getScore("normal", 7))}>
-                                  {getScore("normal", 7) || "N/A"}
+                                <span className={getScoreColorClass(getScore("normal", "7"))}>
+                                  {getScore("normal", "7") || "N/A"}
                                 </span>
                               </td>
                               <td className="p-2">
-                                <span className={getScoreColorClass(getScore("master", 3))}>
-                                  {getScore("master", 3) || "N/A"}
+                                <span className={getScoreColorClass(getScore("master", "3"))}>
+                                  {getScore("master", "3") || "N/A"}
                                 </span>
                               </td>
                               <td className="p-2">
-                                <span className={getScoreColorClass(getScore("master", 5))}>
-                                  {getScore("master", 5) || "N/A"}
+                                <span className={getScoreColorClass(getScore("master", "5"))}>
+                                  {getScore("master", "5") || "N/A"}
                                 </span>
                               </td>
                               <td className="p-2">
-                                <span className={getScoreColorClass(getScore("master", 7))}>
-                                  {getScore("master", 7) || "N/A"}
+                                <span className={getScoreColorClass(getScore("master", "7"))}>
+                                  {getScore("master", "7") || "N/A"}
                                 </span>
                               </td>
                             </tr>
@@ -1812,10 +2188,10 @@ const SkyblockDungeonTracker = () => {
                         <span>Selected Class</span>
                         <span className="flex items-center">
                           {getClassIcon(
-                            getDungeonsData()?.classes?.selected_class || "none"
+                            getDungeonsData()?.classes?.selectedClass || "none"
                           )}
                           <span className="ml-1 capitalize">
-                            {getDungeonsData()?.classes?.selected_class ||
+                            {getDungeonsData()?.classes?.selectedClass ||
                               "None"}
                           </span>
                         </span>
@@ -1921,10 +2297,9 @@ const SkyblockDungeonTracker = () => {
                         <span>
                           {formatNumber(
                             Object.values(
-                              getDungeonsData()?.catacombs?.floors || {}
+                              getDungeonsData()?.completions?.normal || {}
                             ).reduce(
-                              (sum, floor) =>
-                                sum + (floor?.stats?.tier_completions || 0),
+                              (sum, count) => sum + (count || 0),
                               0
                             )
                           )}
@@ -1960,10 +2335,9 @@ const SkyblockDungeonTracker = () => {
                         <span>
                           {formatNumber(
                             Object.values(
-                              getDungeonsData()?.master_catacombs?.floors || {}
+                              getDungeonsData()?.completions?.master || {}
                             ).reduce(
-                              (sum, floor) =>
-                                sum + (floor?.stats?.tier_completions || 0),
+                              (sum, count) => sum + (count || 0),
                               0
                             )
                           )}
@@ -2008,8 +2382,7 @@ const SkyblockDungeonTracker = () => {
                       </div>
                       <div className="font-bold text-lg">
                         {formatTime(
-                          getDungeonsData()?.catacombs?.floors?.[7]?.stats
-                            ?.fastest_time_s_plus || 0
+                          getDungeonsData()?.floors?.normal?.[7]?.fastest_times?.s_plus_rank?.time_ms || 0
                         )}
                       </div>
                     </div>
@@ -2094,19 +2467,19 @@ const SkyblockDungeonTracker = () => {
                                 }`}
                           </h3>
                           <p className="text-text-secondary text-sm">
-                            {getFloorData().stats?.tier_completions || 0}{" "}
+                            {getFloorData().completions || 0}{" "}
                             completions,{" "}
-                            {getFloorData().stats?.times_played || 0} total runs
+                            {getFloorData().times_played || 0} total runs
                           </p>
                         </div>
                         <div className="mt-2 md:mt-0 flex items-center">
                           <div
                             className={`px-4 py-2 rounded font-bold ${getScoreColorClass(
-                              getFloorData().stats?.best_score || 0
+                              getFloorData().best_score || 0
                             )}`}
                           >
                             Best Score:{" "}
-                            {getFloorData().stats?.best_score || "N/A"}
+                            {getFloorData().best_score || "N/A"}
                           </div>
                         </div>
                       </div>
@@ -2124,11 +2497,11 @@ const SkyblockDungeonTracker = () => {
                               </div>
                               <div className="flex items-center text-lg font-semibold">
                                 <Clock className="w-4 h-4 mr-1 text-ui-success" />
-                                {formatTime(getFloorData().stats?.fastest_time)}
+                                {formatTime(getFloorData().fastest_times?.normal?.time_ms)}
                               </div>
                             </div>
 
-                            {getFloorData().stats?.fastest_time_s && (
+                            {getFloorData().fastest_times?.s_rank?.time_ms && (
                               <div className="bg-tertiary p-3 rounded-lg">
                                 <div className="text-xs text-text-secondary">
                                   Fastest S Time
@@ -2136,13 +2509,13 @@ const SkyblockDungeonTracker = () => {
                                 <div className="flex items-center text-lg font-semibold">
                                   <Clock className="w-4 h-4 mr-1 text-ui-primary" />
                                   {formatTime(
-                                    getFloorData().stats?.fastest_time_s
+                                    getFloorData().fastest_times.s_rank.time_ms
                                   )}
                                 </div>
                               </div>
                             )}
 
-                            {getFloorData().stats?.fastest_time_s_plus && (
+                            {getFloorData().fastest_times?.s_plus_rank?.time_ms && (
                               <div className="bg-tertiary p-3 rounded-lg">
                                 <div className="text-xs text-text-secondary">
                                   Fastest S+ Time
@@ -2150,7 +2523,7 @@ const SkyblockDungeonTracker = () => {
                                 <div className="flex items-center text-lg font-semibold">
                                   <Clock className="w-4 h-4 mr-1 text-score-splus" />
                                   {formatTime(
-                                    getFloorData().stats?.fastest_time_s_plus
+                                    getFloorData().fastest_times.s_plus_rank.time_ms
                                   )}
                                 </div>
                               </div>
@@ -2194,20 +2567,20 @@ const SkyblockDungeonTracker = () => {
                           <h4 className="font-semibold mb-3 border-b pb-2 border-accent">
                             Highest Damage
                           </h4>
-                          {getFloorData().most_damage ? (
+                          {getFloorData().stats?.most_damage ? (
                             <div className="bg-tertiary p-4 rounded-lg">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center">
                                   {getClassIcon(
-                                    getFloorData().most_damage.class
+                                    Object.keys(getFloorData().stats.most_damage)[0]
                                   )}
                                   <span className="ml-2 capitalize font-medium">
-                                    {getFloorData().most_damage.class}
+                                    {Object.keys(getFloorData().stats.most_damage)[0]}
                                   </span>
                                 </div>
                                 <div className="text-xl font-bold">
                                   {formatNumber(
-                                    getFloorData().most_damage.value
+                                    Object.values(getFloorData().stats.most_damage)[0]
                                   )}
                                 </div>
                               </div>
@@ -2236,72 +2609,58 @@ const SkyblockDungeonTracker = () => {
                       </div>
 
                       {/* Best Runs */}
-                      {getFloorData().best_runs &&
-                        getFloorData().best_runs.length > 0 && (
-                          <div className="mt-6">
-                            <h4 className="font-semibold mb-3 border-b pb-2 border-accent">
-                              Best Runs
-                            </h4>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-left">
-                                <thead>
-                                  <tr className="bg-tertiary">
-                                    <th className="p-2 text-xs">Date</th>
-                                    <th className="p-2 text-xs">Class</th>
-                                    <th className="p-2 text-xs">Score</th>
-                                    <th className="p-2 text-xs">Time</th>
-                                    <th className="p-2 text-xs">Damage</th>
-                                    <th className="p-2 text-xs">Secrets</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {getFloorData()
-                                    .best_runs.slice(0, 3)
-                                    .map((run, index) => (
-                                      <tr
-                                        key={index}
-                                        className="border-t border-accent"
-                                      >
-                                        <td className="p-2 text-xs">
-                                          {formatDate(run.timestamp)}
-                                        </td>
-                                        <td className="p-2 text-xs flex items-center">
-                                          {getClassIcon(run.dungeon_class)}
-                                          <span className="ml-1 capitalize">
-                                            {run.dungeon_class}
-                                          </span>
-                                        </td>
-                                        <td className="p-2 text-xs">
-                                          <span
-                                            className={getScoreColorClass(
-                                              run.score_exploration +
-                                                run.score_speed +
-                                                run.score_skill +
-                                                run.score_bonus
-                                            )}
-                                          >
-                                            {run.score_exploration +
-                                              run.score_speed +
-                                              run.score_skill +
-                                              run.score_bonus}
-                                          </span>
-                                        </td>
-                                        <td className="p-2 text-xs">
-                                          {formatTime(run.elapsed_time)}
-                                        </td>
-                                        <td className="p-2 text-xs">
-                                          {formatNumber(run.damage_dealt)}
-                                        </td>
-                                        <td className="p-2 text-xs">
-                                          {run.secrets_found}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                </tbody>
-                              </table>
-                            </div>
+                      {getFloorData().best_run && (
+                        <div className="mt-6">
+                          <h4 className="font-semibold mb-3 border-b pb-2 border-accent">
+                            Best Run
+                          </h4>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                              <thead>
+                                <tr className="bg-tertiary">
+                                  <th className="p-2 text-xs">Grade</th>
+                                  <th className="p-2 text-xs">Class</th>
+                                  <th className="p-2 text-xs">Score</th>
+                                  <th className="p-2 text-xs">Time</th>
+                                  <th className="p-2 text-xs">Damage</th>
+                                  <th className="p-2 text-xs">Secrets</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="border-t border-accent">
+                                  <td className="p-2 text-xs">
+                                    {getFloorData().best_run.grade}
+                                  </td>
+                                  <td className="p-2 text-xs flex items-center">
+                                    {getClassIcon(getFloorData().best_run.dungeon_class)}
+                                    <span className="ml-1 capitalize">
+                                      {getFloorData().best_run.dungeon_class}
+                                    </span>
+                                  </td>
+                                  <td className="p-2 text-xs">
+                                    <span
+                                      className={getScoreColorClass(
+                                        getFloorData().best_run.score
+                                      )}
+                                    >
+                                      {getFloorData().best_run.score}
+                                    </span>
+                                  </td>
+                                  <td className="p-2 text-xs">
+                                    {getFloorData().best_run.elapsed_time_formatted}
+                                  </td>
+                                  <td className="p-2 text-xs">
+                                    {formatNumber(getFloorData().best_run.damage_dealt)}
+                                  </td>
+                                  <td className="p-2 text-xs">
+                                    {getFloorData().best_run.secrets_found}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
                           </div>
-                        )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="bg-secondary p-5 rounded-lg text-center text-text-secondary shadow-card">
@@ -2356,11 +2715,11 @@ const SkyblockDungeonTracker = () => {
                   <SectionHeader
                     title="Weight Distribution"
                     icon={<Calculator className="text-ui-primary" size={18} />}
-                    section="weightDistribution"
-                    expanded={expandedSections.weightDistribution}
+                    section="advancedWeightInfo"
+                    expanded={expandedSections.advancedWeightInfo}
                   />
 
-                  {expandedSections.weightDistribution && (
+                  {expandedSections.advancedWeightInfo && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                       <div className="bg-secondary p-3 rounded-lg">
                         <h3 className="text-lg font-semibold mb-2 text-ui-primary">
@@ -2445,74 +2804,6 @@ const SkyblockDungeonTracker = () => {
                               <span className="font-medium">900+</span>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <SectionHeader
-                    title="Advanced Scoring Details"
-                    icon={<Info size={18} className="text-ui-info" />}
-                    section="advancedWeightInfo"
-                    expanded={expandedSections.advancedWeightInfo}
-                  />
-
-                  {expandedSections.advancedWeightInfo && (
-                    <div className="mt-4 bg-secondary p-3 rounded-lg">
-                      <p className="text-xs text-text-secondary mb-1">
-                        The system uses proportional scaling with minor bonuses
-                        for exceptional achievements:
-                      </p>
-                      <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                        <div className="bg-primary p-2 rounded">
-                          <div className="font-semibold mb-1 text-ui-primary">
-                            Catacombs (300 pts)
-                          </div>
-                          <div>• Linear scaling with level</div>
-                          <div>• Catacombs 50 = 300 points</div>
-                        </div>
-
-                        <div className="bg-primary p-2 rounded">
-                          <div className="font-semibold mb-1 text-ui-primary">
-                            Classes (250 pts)
-                          </div>
-                          <div>• Total level contribution (150 pts)</div>
-                          <div>• Average level contribution (100 pts)</div>
-                          <div>• Rewards balanced class progression</div>
-                        </div>
-
-                        <div className="bg-primary p-2 rounded">
-                          <div className="font-semibold mb-1 text-ui-primary">
-                            Secrets (200 pts)
-                          </div>
-                          <div>• Logarithmic scaling (diminishing returns)</div>
-                          <div>• Reference: 150,000 secrets = 200 pts</div>
-                          <div>• Biased toward quality over quantity</div>
-                        </div>
-
-                        <div className="bg-primary p-2 rounded">
-                          <div className="font-semibold mb-1 text-ui-primary">
-                            Completions (150 pts)
-                          </div>
-                          <div>• Logarithmic scaling</div>
-                          <div>• Reference: 10,000 completions = 150 pts</div>
-                        </div>
-
-                        <div className="bg-primary p-2 rounded">
-                          <div className="font-semibold mb-1 text-ui-primary">
-                            Master Mode (50 pts)
-                          </div>
-                          <div>• Points awarded per floor</div>
-                          <div>• Higher floors worth more points</div>
-                          <div>• Scales with completion count</div>
-                        </div>
-
-                        <div className="bg-primary p-2 rounded">
-                          <div className="font-semibold mb-1 text-ui-primary">
-                            Bonuses (50 pts)
-                          </div>
-                          <div>• Perfect scores (up to 20 pts)</div>
-                          <div>• All floors completed (30 pts)</div>
                         </div>
                       </div>
                     </div>
@@ -2646,7 +2937,7 @@ const SkyblockDungeonTracker = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-3">
             <div className="text-center md:text-left">
               <p>
-                Data provided by sky.shiiyu.moe API. Not affiliated with Hypixel
+                Data provided by custom Hypixel API. Not affiliated with Hypixel
                 or Mojang.
               </p>
             </div>
