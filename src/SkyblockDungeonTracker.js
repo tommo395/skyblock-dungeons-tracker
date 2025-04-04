@@ -38,7 +38,7 @@ const SkyblockDungeonTracker = () => {
   const [activeComparisonTab, setActiveComparisonTab] = useState("overview");
 
   // Hypixel API configuration 
-  const API_KEY = "282c4076-5817-4b58-9835-0e7fc54eadc6";
+  const API_KEY = "5cbf578a-5156-4415-a36b-0204b6795d96";
   const HYPIXEL_BASE_URL = "https://api.hypixel.net/v2/skyblock/profiles";
   
   // Dungeoneering XP requirements per level
