@@ -36,9 +36,10 @@ const SkyblockDungeonTracker = () => {
   const [loadingComparison, setLoadingComparison] = useState(false);
   const [comparisonError, setComparisonError] = useState("");
   const [activeComparisonTab, setActiveComparisonTab] = useState("overview");
+  const comparisonInputRef = useRef(null);
 
-  // Hypixel API configuration 
-  const API_KEY = "5cbf578a-5156-4415-a36b-0204b6795d96";
+  // Hypixel API configuration - using environment variable
+  const API_KEY = process.env.REACT_APP_HYPIXEL_API_KEY || "5cbf578a-5156-4415-a36b-0204b6795d96";
   const HYPIXEL_BASE_URL = "https://api.hypixel.net/v2/skyblock/profiles";
   
   // Dungeoneering XP requirements per level
@@ -145,6 +146,16 @@ const SkyblockDungeonTracker = () => {
     }
   }, []);
 
+  // Fix for player head display issues when switching views
+  useEffect(() => {
+    if (viewMode === "single" && displayName) {
+      // Refresh avatar when switching back to single view
+      fetchPlayerAvatar(displayName).then(avatarUrl => {
+        setPlayerAvatar(avatarUrl);
+      });
+    }
+  }, [viewMode, displayName]);
+
   // Apply theme class to body
   useEffect(() => {
     document.body.className = `theme-${currentTheme}`;
@@ -175,7 +186,7 @@ const SkyblockDungeonTracker = () => {
     window.history.pushState({}, "", url);
   };
 
-  // FIXED: Completely rebuilt UUID function to handle network errors better
+  // Get UUID function with improved error handling
   const getUuid = async (username) => {
     if (!username) return null;
     
@@ -348,10 +359,20 @@ const SkyblockDungeonTracker = () => {
     };
   };
 
-  // Fetch player avatar
+  // Fetch player avatar with better caching for reliability
   const fetchPlayerAvatar = async (name) => {
+    if (!name) return null;
+    
     try {
-      const avatarUrl = `https://mc-heads.net/avatar/${encodeURIComponent(name)}/64`;
+      // Add a timestamp to prevent browser caching issues
+      const timestamp = new Date().getTime();
+      const avatarUrl = `https://mc-heads.net/avatar/${encodeURIComponent(name)}/${64}?t=${timestamp}`;
+      
+      // Test that the avatar loads properly
+      const testImage = new Image();
+      testImage.src = avatarUrl;
+      
+      // Set avatar state immediately but return a promise
       setPlayerAvatar(avatarUrl);
       return avatarUrl;
     } catch (err) {
@@ -394,8 +415,8 @@ const SkyblockDungeonTracker = () => {
     const date = new Date(timestamp);
     return date.toLocaleDateString();
   };
-
-  // COMPLETELY REBUILT: Fetch from Hypixel API with much better error handling
+  
+  // Fetch player data with networth
   const fetchPlayerData = async (name = playerNameInput) => {
     if (!name) return;
 
@@ -468,6 +489,9 @@ const SkyblockDungeonTracker = () => {
       // Step 4: Process the data
       const processedData = processProfileData(data, uuid, name);
       
+      // Store the UUID with the player data
+      processedData.player.uuid = uuid;
+      
       // Step 5: Update state with the processed data
       setPlayerData(processedData);
       setDisplayName(name);
@@ -499,7 +523,7 @@ const SkyblockDungeonTracker = () => {
       setLoading(false);
     }
   };
-  
+
   // Process the profile data from Hypixel API
   const processProfileData = (data, uuid, name) => {
     try {
@@ -524,7 +548,7 @@ const SkyblockDungeonTracker = () => {
         activeProfile = latestProfile;
       }
       
-      // FIXED: Handle UUID checks more comprehensively
+      // Handle UUID checks more comprehensively
       const formattedProfiles = {};
       
       for (const profile of data.profiles) {
@@ -800,7 +824,6 @@ const SkyblockDungeonTracker = () => {
   
   // Fetch player data for comparison
   const fetchPlayerDataForComparison = async (name) => {
-    // Same improved robustness as the main data fetch function
     if (!name) return null;
     
     setLoadingComparison(true);
@@ -863,6 +886,8 @@ const SkyblockDungeonTracker = () => {
         completions: activeProfile.dungeons.stats.totalRuns || 0,
         fastestF7: formatTime(activeProfile.dungeons?.floors?.normal?.[7]?.fastest_times?.normal?.time_ms || 0),
         fastestM7: formatTime(activeProfile.dungeons?.floors?.master?.[7]?.fastest_times?.normal?.time_ms || 0),
+        uuid: uuid,
+        profileId: activeProfileId
       };
     } catch (err) {
       console.error("Error fetching comparison data:", err);
@@ -892,6 +917,17 @@ const SkyblockDungeonTracker = () => {
     }
   };
   
+  // Fix for the comparison search bar focus issue
+  const handleComparisonInputChange = (e) => {
+    setComparisonInput(e.target.value);
+    
+    // Add these lines to maintain focus after every keystroke
+    setTimeout(() => {
+      if (comparisonInputRef.current) {
+        comparisonInputRef.current.focus();
+      }
+    }, 0);
+  };
   // Handle comparison form submission
   const handleComparisonSubmit = async (e) => {
     e.preventDefault();
@@ -910,6 +946,13 @@ const SkyblockDungeonTracker = () => {
       setComparisonInput("");
       updateUrlWithComparison(newPlayers);
     }
+    
+    // Refocus the input after submission
+    setTimeout(() => {
+      if (comparisonInputRef.current) {
+        comparisonInputRef.current.focus();
+      }
+    }, 0);
   };
   
   // Remove player from comparison
@@ -945,6 +988,8 @@ const SkyblockDungeonTracker = () => {
       completions: getTotalCompletions(),
       fastestF7: getFastestF7Time(),
       fastestM7: getFastestM7Time(),
+      uuid: playerData.player.uuid,
+      profileId: activeProfile.profile_id
     };
     
     const newPlayers = [...comparedPlayers, playerForComparison];
@@ -1366,8 +1411,9 @@ const SkyblockDungeonTracker = () => {
             >
               <input
                 type="text"
+                ref={comparisonInputRef}
                 value={comparisonInput}
-                onChange={(e) => setComparisonInput(e.target.value)}
+                onChange={handleComparisonInputChange}
                 placeholder="Add player to comparison"
                 className="w-full bg-tertiary text-text-primary px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-ui-primary"
               />

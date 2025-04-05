@@ -13,7 +13,6 @@
     "react-dom": "^19.0.0",
     "react-scripts": "5.0.1",
     "recharts": "^2.15.1",
-    "skyhelper-networth": "^1.27.3",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
